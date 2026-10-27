@@ -4,9 +4,29 @@ Parchment is an AI-native Markdown editor for macOS 14 or later. Write, review, 
 
 See [Version history](docs/versions.md) for release dates, build numbers, and changes.
 
-## Build and open
+## Install and open
 
-The build requires Apple command-line developer tools and Swift 6.2 or later. The first build downloads Apple's Swift Markdown parser and its cmark dependency. Normal editor use requires no network connection.
+Use the macOS installer (`.pkg`) to install or upgrade Parchment. Local installers are in `dist/`; their names include the version and architecture.
+
+1. Quit Parchment before an upgrade.
+2. Open the latest installer for your Mac in Finder, such as `dist/Parchment-0.1.10-arm64.pkg`.
+3. Choose the installer options for the agent skill, `parchment://` links, and the default app for Markdown files.
+4. Complete the installation.
+5. Open Parchment from Applications or Spotlight.
+
+The installer places the app in `/Applications/Parchment.app`. Normal editor use requires no network connection.
+
+### Build from source
+
+Source builds require Apple command-line developer tools and Swift 6.2 or later. The first build downloads Apple's Swift Markdown parser and its cmark dependency.
+
+To create an installer from this checkout, run:
+
+```sh
+bash scripts/build-installer.sh
+```
+
+For development, build and open the app directly:
 
 ```sh
 bash scripts/build-app.sh
@@ -15,7 +35,7 @@ open dist/Parchment.app
 
 The app bundle uses a local ad hoc signature. It is not notarized for distribution.
 
-This machine's default Swift build backend fails during initialization. The build script uses the alternate `native` backend. A future Swift toolchain can remove that option after the default backend works.
+This machine's default Swift build backend fails during initialization. The build script uses the alternate `native` backend.
 
 ## Editing
 
