@@ -80,6 +80,59 @@ import ParchmentCore
         expect(EditorShortcut.action(for: command) == nil, "Command-S remains the normal save shortcut")
         let controlM = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 46)!
         expect(EditorShortcut.action(for: controlM) == .comment, "Control-M control-character events route to comments")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("parchment-external-" + UUID().uuidString)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let path = directory.appendingPathComponent("external.md")
+            try "Original text\n".write(to: path, atomically: true, encoding: .utf8)
+            let workspace = Workspace(recoveryDirectory: directory.appendingPathComponent("recovery"))
+            workspace.open(path)
+            let external = workspace.active!
+            defer { workspace.documents.forEach { $0.saveTask?.cancel(); $0.renderTask?.cancel(); $0.stopWatching() } }
+            let externalPane = SourcePane(document: external, beginComment: {})
+            let externalCoordinator = externalPane.makeCoordinator()
+            _ = externalPane.makeEditor(coordinator: externalCoordinator)
+            external.selection = NSRange(location: 0, length: 8)
+            external.addComment(body: "Keep this pending review.", pending: true)
+            external.changed("Local unsaved text\n")
+            try "External replacement\n".write(to: path, atomically: true, encoding: .utf8)
+            for _ in 0..<40 where external.externalChange == nil { try? await Task.sleep(for: .milliseconds(25)) }
+            expect(external.externalChange?.text == "External replacement\n" && external.text == "Local unsaved text\n", "atomic external replacements prompt without replacing local text")
+            external.keepLocalChanges()
+            external.changed("Local edits after rejection\n")
+            try? await Task.sleep(for: .milliseconds(950))
+            expect(try String(contentsOf: path, encoding: .utf8) == "External replacement\n" && external.autosaveSuspended, "rejecting external changes pauses autosave for subsequent edits")
+            expect(workspace.persist(), "conflicting local text persists in recovery")
+            let restored = Workspace(recoveryDirectory: directory.appendingPathComponent("recovery"))
+            expect(restored.active?.text == external.text && restored.active?.autosaveSuspended == true && restored.active?.isDirty == true, "recovery preserves local text and paused autosave")
+            restored.documents.forEach { $0.saveTask?.cancel(); $0.renderTask?.cancel(); $0.stopWatching() }
+            try "External in-place edit\n".write(to: path, atomically: false, encoding: .utf8)
+            for _ in 0..<40 where external.externalChange == nil { try? await Task.sleep(for: .milliseconds(25)) }
+            expect(external.externalChange?.text == "External in-place edit\n", "in-place external edits remain observable after atomic replacement")
+            external.loadExternalChanges()
+            expect(external.text == "External in-place edit\n" && external.sourceTextView?.string == external.text && external.renderedSource == external.text && !external.autosaveSuspended, "accepting external changes updates both panes and resumes autosave")
+            expect(external.comments.pendingCount == 1, "reloading Markdown preserves local review drafts")
+            try external.save()
+            try? await Task.sleep(for: .milliseconds(150))
+            expect(external.externalChange == nil, "the app's own saves do not trigger external-change prompts")
+            external.changed("Local text before race\n")
+            try "External save race\n".write(to: path, atomically: true, encoding: .utf8)
+            do { try external.save(); expect(false, "save must detect an external write before watcher delivery") }
+            catch DocumentSaveError.externalChange { expect(true, "save detects an external write before watcher delivery") }
+            expect(try String(contentsOf: path, encoding: .utf8) == "External save race\n", "automatic save never overwrites an unreviewed external version")
+            external.keepLocalChanges()
+            try external.save(overwriteExternalChanges: true)
+            expect(try String(contentsOf: path, encoding: .utf8) == "Local text before race\n" && !external.autosaveSuspended, "explicit overwrite saves local text and resumes autosave")
+            try FileManager.default.removeItem(at: path)
+            for _ in 0..<40 where external.externalChange == nil { try? await Task.sleep(for: .milliseconds(25)) }
+            expect(external.externalChange != nil && external.externalChange?.text == nil && external.text == "Local text before race\n", "deleting the file preserves local text and pauses autosave")
+            external.keepLocalChanges()
+            try "Recreated externally\n".write(to: path, atomically: true, encoding: .utf8)
+            for _ in 0..<40 where external.externalChange == nil { try? await Task.sleep(for: .milliseconds(25)) }
+            expect(external.externalChange?.text == "Recreated externally\n", "watching continues when a deleted file reappears")
+            UserDefaults.standard.removeObject(forKey: "layout:\(path.path)")
+        } catch { failures += 1; print("FAIL external file checks: \(error)") }
         document.saveTask?.cancel(); document.renderTask?.cancel()
         print("Editor checks: \(failures) failures")
         return failures == 0 ? 0 : 1

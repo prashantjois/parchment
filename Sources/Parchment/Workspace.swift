@@ -5,6 +5,14 @@ import ParchmentCore
 import ParchmentIntegration
 
 struct JumpRequest { var id = UUID(); var range: NSRange }
+struct ExternalFileChange {
+    var text: String?
+    var message: String
+}
+enum DocumentSaveError: LocalizedError {
+    case externalChange
+    var errorDescription: String? { "Autosave is paused because the file changed outside Parchment. Load the external changes or save explicitly." }
+}
 
 @MainActor final class EditorDocument: ObservableObject, @preconcurrency Identifiable {
     @Published var id: UUID
@@ -20,6 +28,8 @@ struct JumpRequest { var id = UUID(); var range: NSRange }
     @Published var isDirty = false
     @Published var saveMessage = ""
     @Published var loadedRemoteImages: Set<String> = []
+    @Published var externalChange: ExternalFileChange?
+    @Published var autosaveSuspended = false
     @Published var browserRoot: URL
     @Published var browserExpanded: Set<String> = []
     @Published var integrationAttachment: JSON = .object(["status": .string("unattached")])
@@ -33,6 +43,8 @@ struct JumpRequest { var id = UUID(); var range: NSRange }
     var sourceScrollView: NSScrollView?
     let undoManager = UndoManager()
     var renderedSource: String
+    private var lastDiskText: String?
+    private var fileWatcher: FileWatcher?
 
     init(id: UUID? = nil, url: URL?, text: String, layout: FileLayout = FileLayout(), comments: CommentFile? = nil) {
         self.id = id ?? comments?.documentID ?? UUID(); self.url = url; self.text = text; self.layout = layout
@@ -41,6 +53,7 @@ struct JumpRequest { var id = UUID(); var range: NSRange }
         rendered = MarkdownRenderer.render(text, baseURL: url?.deletingLastPathComponent())
         browserRoot = url?.deletingLastPathComponent() ?? FileManager.default.homeDirectoryForCurrentUser
         self.comments.documentID = self.id
+        lastDiskText = url == nil ? nil : text
     }
     var title: String { url?.lastPathComponent ?? "Untitled" }
     func changed(_ value: String) {
@@ -60,22 +73,78 @@ struct JumpRequest { var id = UUID(); var range: NSRange }
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(800))
             guard !Task.isCancelled, let self else { return }
-            if self.url != nil {
+            if self.url != nil && !self.autosaveSuspended {
                 do { try self.save() } catch { self.saveMessage = error.localizedDescription }
             }
             self.onChange?()
         }
     }
-    func save(to destination: URL? = nil) throws {
+    func startWatching() {
+        fileWatcher = nil
+        guard let url else { return }
+        if autosaveSuspended { lastDiskText = try? String(contentsOf: url, encoding: .utf8) }
+        fileWatcher = FileWatcher(url: url) { [weak self] in self?.checkForExternalChanges() }
+        checkForExternalChanges()
+    }
+    func stopWatching() { fileWatcher = nil }
+    func checkForExternalChanges() {
+        guard let url else { return }
+        let diskText = try? String(contentsOf: url, encoding: .utf8)
+        guard diskText != lastDiskText else { return }
+        lastDiskText = diskText
+        guard diskText != text else { return }
+        saveTask?.cancel()
+        autosaveSuspended = true; isDirty = true
+        externalChange = ExternalFileChange(text: diskText, message: diskText == nil
+            ? "The file was removed or cannot be read. Your local text is still available."
+            : "This file changed outside Parchment. Load the external version or keep your local text.")
+        saveMessage = "External changes · Autosave paused"
+        onChange?()
+    }
+    func keepLocalChanges() {
+        externalChange = nil
+        autosaveSuspended = true; isDirty = true
+        saveTask?.cancel()
+        saveMessage = "Autosave paused · Save to replace external changes"
+        onChange?()
+    }
+    func loadExternalChanges() {
+        guard let url else { return }
+        do {
+            let value = try String(contentsOf: url, encoding: .utf8)
+            saveTask?.cancel(); renderTask?.cancel()
+            text = value; renderedSource = value
+            rendered = MarkdownRenderer.render(value, baseURL: url.deletingLastPathComponent())
+            sourceTextView?.string = value
+            undoManager.removeAllActions()
+            selection = NSRange(location: min(selection.location, value.utf16.count), length: 0)
+            reveal(selection)
+            lastDiskText = value; externalChange = nil; autosaveSuspended = false
+            isDirty = true; saveMessage = "Loaded external changes"
+            // Preserve local comments and review drafts through the usual save path.
+            scheduleSave()
+        } catch {
+            externalChange = ExternalFileChange(text: nil, message: "The external version cannot be read: \(error.localizedDescription)")
+        }
+    }
+    func save(to destination: URL? = nil, overwriteExternalChanges: Bool = false) throws {
         guard let destination = destination ?? url else { return }
+        let sameFile = destination.standardizedFileURL == url?.standardizedFileURL
+        if sameFile {
+            checkForExternalChanges()
+            if autosaveSuspended && !overwriteExternalChanges { throw DocumentSaveError.externalChange }
+        }
         let newID = url != nil && url?.standardizedFileURL != destination.standardizedFileURL ? UUID() : id
         var companion = comments; companion.documentID = newID
         // Do not change the active path until both writes succeed.
         try text.write(to: destination, atomically: true, encoding: .utf8)
+        if sameFile { lastDiskText = text }
         try companion.write(for: destination)
         if url != destination { browserRoot = destination.deletingLastPathComponent() }
         id = newID; comments = companion
         url = destination; comments.document = destination.lastPathComponent
+        lastDiskText = text; externalChange = nil; autosaveSuspended = false
+        if !sameFile { startWatching() }
         isDirty = false; saveMessage = "Saved"; onChange?()
     }
     func reveal(_ range: NSRange) {
@@ -133,6 +202,7 @@ struct SessionDocument: Codable {
     var layout: FileLayout
     var comments: CommentFile
     var dirty: Bool
+    var autosaveSuspended: Bool?
 }
 struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocument] }
 
@@ -161,6 +231,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     func attach(_ document: EditorDocument) {
         do { try integration?.register(document) } catch { document.integrationError = error.localizedDescription }
         document.onChange = { [weak self] in self?.scheduleRecovery() }
+        document.startWatching()
         documents.append(document); activeID = document.id
     }
     @discardableResult func startIntegration(headless: Bool = false, server: LocalAPIServer? = nil) -> Bool {
@@ -216,14 +287,21 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         }
         do {
             let oldID = document.id
-            try document.save(to: destination)
+            document.checkForExternalChanges()
+            if document.autosaveSuspended && destination == document.url {
+                let alert = NSAlert(); alert.messageText = "Replace the external version of \(document.title)?"
+                alert.informativeText = "Saving will replace the file on disk with your local text."
+                alert.addButton(withTitle: "Replace"); alert.addButton(withTitle: "Cancel")
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            }
+            try document.save(to: destination, overwriteExternalChanges: true)
             if activeID == oldID { activeID = document.id }
             scheduleRecovery()
         }
         catch { self.error = "Cannot save: \(error.localizedDescription)" }
     }
     func close(_ document: EditorDocument) {
-        if document.url == nil && (!document.text.isEmpty || !document.comments.threads.isEmpty) {
+        if (document.url == nil || document.autosaveSuspended) && (!document.text.isEmpty || !document.comments.threads.isEmpty || document.isDirty) {
             let alert = NSAlert(); alert.messageText = "Save \(document.title) before closing?"
             alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Discard")
             let response = alert.runModal()
@@ -233,6 +311,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
             do { try document.save() } catch { self.error = error.localizedDescription; return }
         }
         persistLayout(document)
+        document.stopWatching()
         let index = documents.firstIndex(where: { $0.id == document.id }) ?? 0
         documents.removeAll { $0.id == document.id }
         if activeID == document.id { activeID = documents.isEmpty ? nil : documents[min(index, documents.count - 1)].id }
@@ -283,7 +362,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         guard canPersistRecovery else { return false }
         documents.forEach(persistLayout)
         let snapshot = SessionSnapshot(active: activeID, documents: documents.map {
-            SessionDocument(id: $0.id, path: $0.url?.path, text: $0.text, layout: $0.layout, comments: $0.comments, dirty: $0.isDirty)
+            SessionDocument(id: $0.id, path: $0.url?.path, text: $0.text, layout: $0.layout, comments: $0.comments, dirty: $0.isDirty, autosaveSuspended: $0.autosaveSuspended)
         })
         do {
             try CommentFile.encoder.encode(snapshot).write(to: support.appendingPathComponent("session.json"), options: .atomic)
@@ -312,7 +391,9 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
                     }
                 }
                 let document = EditorDocument(id: item.id, url: path, text: text, layout: item.layout, comments: comments)
-                document.isDirty = dirty; attach(document)
+                document.isDirty = dirty; document.autosaveSuspended = item.autosaveSuspended ?? false
+                if document.autosaveSuspended { document.saveMessage = "Autosave paused · Save to replace external changes" }
+                attach(document)
             }
             activeID = documents.contains(where: { $0.id == snapshot.active }) ? snapshot.active : documents.first?.id
             if !recoveryWarnings.isEmpty { self.error = "Some files could not be reopened. Their recovered content is available in unsaved tabs.\n" + recoveryWarnings.joined(separator: "\n") }

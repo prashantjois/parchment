@@ -120,7 +120,7 @@ struct AppSettings: View {
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let workspace = Self.workspace else { return .terminateNow }
-        for document in workspace.documents where document.isDirty && document.url != nil {
+        for document in workspace.documents where document.isDirty && document.url != nil && !document.autosaveSuspended {
             do { try document.save() }
             catch { let alert = NSAlert(error: error); alert.runModal(); return .terminateCancel }
         }
@@ -223,6 +223,12 @@ struct DocumentWorkspace: View {
         }
         .animation(.easeInOut(duration: 0.18), value: document.layout.showFiles)
         .animation(.easeInOut(duration: 0.18), value: document.layout.showRight)
+        .alert("\(document.title) Changed Externally", isPresented: Binding(get: { document.externalChange != nil }, set: { if !$0 { document.externalChange = nil } })) {
+            Button("Load External Changes") { document.loadExternalChanges() }.disabled(document.externalChange?.text == nil)
+            Button("Keep Local Changes", role: .cancel) { document.keepLocalChanges() }
+        } message: {
+            Text((document.externalChange?.message ?? "") + " If you keep local changes, autosave will pause until you explicitly save. Your local text will survive quitting and reopening Parchment.")
+        }
         .onChange(of: document.layout) { _, _ in workspace.scheduleRecovery() }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {

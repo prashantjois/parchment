@@ -109,5 +109,5 @@ The core checks use a standalone Swift executable so they work with command-line
 - Local raster images render. Remote images stay blocked by default. In Settings → General, toggle **Automatically load remote images**. Right-click a blocked image to **Load This Image** or **Automatically Load All Remote Images**. The latter enables the setting for every document. Image paste and asset management are not implemented.
 - Code blocks have theme styles but no language-aware token highlighting yet.
 - Scroll synchronization uses document proportions, not exact block alignment.
-- The app does not watch files for external changes. Close a file before another tool edits it, then reopen it.
+- Parchment watches open files for external changes and asks whether to load the external version or keep your local text. Keeping local text pauses autosave until an explicit save. The local text and paused state survive restarts. Reloading preserves local comments and review drafts.
 - Published comments have flat replies and an immutable event history. Pending review drafts support editing and deletion.
