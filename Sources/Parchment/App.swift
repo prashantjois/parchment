@@ -252,11 +252,11 @@ struct DocumentWorkspace: View {
                 HStack(spacing: 0) {
                     SourcePane(document: document, beginComment: workspace.beginComment).frame(width: max(120, (geometry.size.width - 5) * document.layout.splitFraction))
                     ResizeHandle(value: $document.layout.splitFraction, limits: 0.2...0.8, scale: max(1, geometry.size.width - 5))
-                    RenderedPane(document: document, themes: workspace.themes, beginComment: workspace.beginComment)
+                    RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment)
                 }
             }
         } else if document.layout.mode == .raw { SourcePane(document: document, beginComment: workspace.beginComment) }
-        else { RenderedPane(document: document, themes: workspace.themes, beginComment: workspace.beginComment) }
+        else { RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment) }
     }
     func toolbarButton(_ title: String, icon: String, shortcut: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) { Label(title, systemImage: icon).foregroundStyle(active ? Color.accentColor : Color.primary) }.help("\(title) (\(shortcut))")

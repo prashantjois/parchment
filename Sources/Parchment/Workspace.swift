@@ -259,7 +259,22 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         } catch { self.error = "Cannot open \(url.lastPathComponent): \(error.localizedDescription)" }
     }
     func openIncomingURL(_ url: URL) {
-        if url.isFileURL { open(url); return }
+        if url.isFileURL {
+            guard [nil, "", "localhost"].contains(url.host) else { error = "Only local file links can open in Parchment."; return }
+            let file = URL(fileURLWithPath: url.path).standardizedFileURL.resolvingSymlinksInPath()
+            if (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                if active == nil { newDocument() }
+                active?.browserRoot = file; active?.layout.showFiles = true
+            } else {
+                open(file)
+                if let fragment = url.fragment, let document = documents.first(where: { $0.url == file }),
+                   let heading = document.rendered.headings.first(where: { $0.id == (fragment.removingPercentEncoding ?? fragment) }) {
+                    document.layout.cursorLocation = heading.location
+                    document.reveal(NSRange(location: heading.location, length: 0))
+                }
+            }
+            scheduleRecovery(); return
+        }
         do {
             let link = try DocumentLink(url: url)
             open(link.fileURL)

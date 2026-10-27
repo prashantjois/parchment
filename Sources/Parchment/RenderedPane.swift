@@ -39,6 +39,8 @@ struct RenderedPane: NSViewRepresentable {
     @ObservedObject var themes: ThemeLibrary
     var previewCSS: String? = nil
     var allowsComments = true
+    var openDocument: ((URL) -> Void)? = nil
+    var openExternal: (URL) -> Void = { NSWorkspace.shared.open($0) }
     var beginComment: () -> Void
     @AppStorage("loadRemoteImages") private var loadRemoteImages = false
     @Environment(\.colorScheme) private var colorScheme
@@ -163,12 +165,21 @@ struct RenderedPane: NSViewRepresentable {
             }
         }
         func requestComment() { web?.evaluateJavaScript("commentSelection()", completionHandler: nil) }
+        func openLink(_ url: URL) {
+            let sameFile = url.isFileURL && URL(fileURLWithPath: url.path).standardizedFileURL == parent.document.url?.standardizedFileURL
+            if let fragment = url.fragment, !fragment.isEmpty, url.scheme == "about" || sameFile {
+                let decoded = fragment.removingPercentEncoding ?? fragment
+                let literal = String(data: try! JSONSerialization.data(withJSONObject: decoded, options: .fragmentsAllowed), encoding: .utf8)!
+                web?.evaluateJavaScript("document.getElementById(\(literal))?.scrollIntoView()", completionHandler: nil)
+            } else if url.isFileURL && [nil, "", "localhost"].contains(url.host) || url.scheme?.lowercased() == "parchment" {
+                parent.openDocument?(url)
+            } else if ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "") {
+                parent.openExternal(url)
+            }
+        }
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard action.navigationType == .linkActivated, let url = action.request.url else { decisionHandler(.allow); return }
-            if let fragment = url.fragment, !fragment.isEmpty, url.scheme == "about" || url.deletingLastPathComponent() == parent.document.url?.deletingLastPathComponent() {
-                let literal = String(data: try! JSONSerialization.data(withJSONObject: fragment, options: .fragmentsAllowed), encoding: .utf8)!
-                webView.evaluateJavaScript("document.getElementById(\(literal))?.scrollIntoView()", completionHandler: nil)
-            } else if ["https", "http", "mailto"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url) }
+            openLink(url)
             decisionHandler(.cancel)
         }
     }

@@ -23,6 +23,8 @@ Raw mode provides native text editing, selection, cut/copy/paste, undo/redo, fin
 
 The file browser starts in the current file's folder. An unsaved document starts in the user's home folder. The browser supports expandable folders and parent navigation.
 
+In Rendered and Split modes, clicking a local file link opens or selects its tab. Heading fragments navigate to the heading in the target file. Folder links open the file browser. Web links open in the system's default browser.
+
 The right sidebar shows either the table of contents or comments. Its two toolbar buttons select the panel. Clicking the active panel's button closes the sidebar. The file browser remains independent.
 
 | Toolbar action | Shortcut |

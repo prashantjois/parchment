@@ -90,6 +90,30 @@ import ParchmentCore
             workspace.open(path)
             let external = workspace.active!
             defer { workspace.documents.forEach { $0.saveTask?.cancel(); $0.renderTask?.cancel(); $0.stopWatching() } }
+            let linked = directory.appendingPathComponent("Linked café + #.md")
+            try "# Target\n\n## Section\n".write(to: linked, atomically: true, encoding: .utf8)
+            var externalLinks: [URL] = []
+            let preview = RenderedPane(document: external, themes: workspace.themes,
+                openDocument: workspace.openIncomingURL, openExternal: { externalLinks.append($0) }, beginComment: {})
+            let navigation = preview.makeCoordinator()
+            var target = URLComponents(url: linked, resolvingAgainstBaseURL: false)!
+            target.fragment = "section"
+            navigation.openLink(target.url!)
+            expect(workspace.active?.url == linked && workspace.active?.jump?.range.location == 10, "local preview links open the target file and heading")
+            workspace.active!.changed("Local target edits")
+            navigation.openLink(linked)
+            expect(workspace.active?.text == "Local target edits" && workspace.documents.filter { $0.url == linked }.count == 1, "local links reuse existing tabs and preserve unsaved edits")
+            navigation.openLink(try DocumentLink.url(for: path, line: 1))
+            expect(workspace.active?.id == external.id, "Parchment links navigate inside the current workspace")
+            navigation.openLink(directory)
+            expect(external.browserRoot.path == directory.resolvingSymlinksInPath().path && external.layout.showFiles, "folder links navigate the file browser")
+            let browser = URL(string: "https://example.com/guide#section")!
+            navigation.openLink(browser)
+            expect(externalLinks == [browser] && workspace.active?.id == external.id, "external links use the system-browser action without changing tabs")
+            navigation.openLink(URL(string: "file://remote-host/tmp/ignored.md")!)
+            expect(workspace.active?.id == external.id && externalLinks.count == 1, "remote file URLs do not enter local navigation")
+            workspace.documents.first(where: { $0.url == linked })?.saveTask?.cancel()
+            UserDefaults.standard.removeObject(forKey: "layout:\(linked.path)")
             let externalPane = SourcePane(document: external, beginComment: {})
             let externalCoordinator = externalPane.makeCoordinator()
             _ = externalPane.makeEditor(coordinator: externalCoordinator)

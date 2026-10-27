@@ -99,7 +99,15 @@ public enum MarkdownRenderer {
         }
         func safeLink(_ value: String) -> String? {
             guard !value.contains(where: { $0.isNewline || $0.asciiValue.map { $0 < 32 } == true }) else { return nil }
+            if value.hasPrefix("//") { return "https:" + value }
             let scheme = URL(string: value)?.scheme?.lowercased()
+            if scheme == "parchment" {
+                guard let url = URL(string: value), (try? DocumentLink(url: url)) != nil else { return nil }
+                return value
+            }
+            if scheme == "file", let url = URL(string: value) {
+                return [nil, "", "localhost"].contains(url.host) ? value : nil
+            }
             return scheme == nil || ["https", "http", "mailto"].contains(scheme!) ? value : nil
         }
         func imageSource(_ value: String) -> String? {

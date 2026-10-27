@@ -367,6 +367,14 @@ final class CoreTests {
         let python = "\"\"\"multi\nline # string\"\"\""
         expectEqual(SyntaxHighlighter.tokens(in: python, language: "python").filter { $0.kind != nil }.map(\.kind), ["string"])
     }
+    func testRendererPreservesLocalAndExternalNavigationLinks() {
+        let html = MarkdownRenderer.render("[Relative](docs/guide.md#heading) [File](file:///tmp/a.md) [Parchment](parchment://Users/me/a.md?line=2) [Web](https://example.com) [Protocol relative](//example.com/path) [Unsafe](parchment://open?path=/tmp/a.md&session_token=secret) [Remote file](file://server/tmp/a.md)").html
+        for href in ["docs/guide.md#heading", "file:///tmp/a.md", "parchment://Users/me/a.md?line=2", "https://example.com", "https://example.com/path"] {
+            expectTrue(html.contains("href=\"\(href)\""))
+        }
+        expectFalse(html.contains("href=\"parchment://open"))
+        expectFalse(html.contains("href=\"file://server"))
+    }
     func testCodeAndAttributeValuesAreEscaped() {
         let html = MarkdownRenderer.render("`<img src=x onerror=bad>`\n\n[link](https://example.com/?a=1&b=2)").html
         expectTrue(html.contains("&lt;img")); expectFalse(html.contains("<img src=x"))
@@ -421,6 +429,7 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testSyntaxHighlightingUsesTheFenceLanguageAndPreservesText", suite.testSyntaxHighlightingUsesTheFenceLanguageAndPreservesText),
             ("testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets", suite.testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets),
             ("testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole", suite.testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole),
+            ("testRendererPreservesLocalAndExternalNavigationLinks", suite.testRendererPreservesLocalAndExternalNavigationLinks),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
         for (name, test) in tests {
