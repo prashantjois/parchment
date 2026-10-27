@@ -3,6 +3,9 @@
 /.swiftpm/
 /build/
 /dist/
+/DerivedData/
+*.dSYM/
+*.xcresult/
 
 # Packaged applications and installers.
 *.app/
@@ -32,6 +35,7 @@ __pycache__/
 # macOS and per-user editor files.
 .DS_Store
 .AppleDouble
+._*
 xcuserdata/
 *.xcuserstate
 *.swp
