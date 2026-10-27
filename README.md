@@ -6,15 +6,64 @@ See [Version history](docs/versions.md) for release dates, build numbers, and ch
 
 ## Install and open
 
-Use the macOS installer (`.pkg`) to install or upgrade Parchment. Local installers are in `dist/`; their names include the version and architecture.
+Use the macOS installer (`.pkg`) to install or upgrade Parchment. Download it from [the latest GitHub Release](https://github.com/prashantjois/parchment/releases/latest). Each release includes the installer and its SHA-256 checksum. Installer names include the version and architecture.
 
 1. Quit Parchment before an upgrade.
-2. Open the latest installer for your Mac in Finder, such as `dist/Parchment-0.1.10-arm64.pkg`.
-3. Choose the installer options for the agent skill, `parchment://` links, and the default app for Markdown files.
+2. Open the installer for your Mac in Finder.
+3. Choose the options for the agent skill, `parchment://` links, and the default app for Markdown files.
 4. Complete the installation.
 5. Open Parchment from Applications or Spotlight.
 
-The installer places the app in `/Applications/Parchment.app`. Normal editor use requires no network connection.
+The installer places the app in `/Applications/Parchment.app`. Normal editor use requires no network connection. Local builds and installers are in `dist/`, which Git excludes.
+
+### macOS security prompt
+
+The installer is unsigned. The app uses an ad hoc signature, and Apple has not notarized it. macOS can block the download with an “Apple could not verify” malware warning.
+
+If you trust this release and macOS blocks it:
+
+1. Try to open the installer once.
+2. Open **System Settings → Privacy & Security**.
+3. Under **Security**, click **Open Anyway** for the Parchment installer.
+4. Authenticate and approve opening the installer.
+
+If macOS blocks the installed app, repeat these steps for Parchment. See [Apple's instructions](https://support.apple.com/en-us/102445).
+
+### Install from Terminal
+
+From this checkout, run:
+
+```sh
+bash scripts/install.sh
+```
+
+The script downloads the latest published release for your Mac and verifies its checksum. It then runs macOS's command-line installer with the same setup actions as the graphical installer. Only the installation step requests administrator access. Run the script without `sudo`.
+
+The script requires no Swift toolchain, Python, or GitHub CLI. It avoids opening the package in Finder, but it does not sign or notarize Parchment. A first-launch security prompt can still require **Open Anyway**.
+
+The default choices match the graphical installer:
+
+| Setup action | Default | Script option |
+| --- | --- | --- |
+| Install the agent skill in `~/.agents/skills/parchment` | On | `--skip-skill` skips it. |
+| Register `parchment://` links immediately | On | `--skip-register` skips it. |
+| Make Parchment the default for `.md` and `.markdown` files | Off | `--markdown-default` enables it. |
+
+The skill installer backs up a different existing copy. Skipping link registration preserves existing registrations. The default app choice leaves `.txt` files unchanged. MCP client configuration remains a separate step.
+
+For example, to make Parchment the default Markdown app without installing the skill, run:
+
+```sh
+bash scripts/install.sh --skip-skill --markdown-default
+```
+
+To install a local build, keep its `.pkg.sha256` file beside the package and run:
+
+```sh
+bash scripts/install.sh --package dist/Parchment-0.1.13-arm64.pkg
+```
+
+Use `--version 0.1.12` to select a published version. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
 
 ### Build from source
 

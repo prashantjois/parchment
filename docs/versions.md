@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.12 | 13 | 2026-10-27 | Current release | Moved comment and review instructions from the README to the Help menu. |
+| 0.1.13 | 14 | 2026-10-27 | Current release | Added a command-line installer and documented macOS security prompts. |
+| 0.1.12 | 13 | 2026-10-27 | `1e977f1`, tag `v0.1.12` | Moved comment and review instructions from the README to the Help menu. |
 | 0.1.11 | 12 | 2026-10-27 | `a5433c1` | Moved editing instructions from the README to the Help menu. |
 | 0.1.10 | 11 | 2026-10-27 | `2c6559e` | Made the installer the main README installation path. |
 | 0.1.9 | 10 | 2026-10-27 | `b66bfb6` | Removed the README Checks section. |
@@ -17,6 +18,14 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.13
+
+- Added scripts/install.sh to download a release or use a local package, verify its checksum, and install through macOS.
+- Script choices match the graphical installer: agent skill and immediate URL registration on, default Markdown app off.
+- Added flags for each choice, a specific release version, and a dry run without installation.
+- Documented the unsigned installer, missing Apple notarization, and the Open Anyway steps in the README.
+- Linked the README to published GitHub Releases.
 
 ## 0.1.12
 
