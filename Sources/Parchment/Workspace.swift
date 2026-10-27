@@ -375,16 +375,22 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         }
         catch { self.error = "Cannot save: \(error.localizedDescription)" }
     }
-    func close(_ document: EditorDocument) {
+    static func confirmClose(_ document: EditorDocument) -> NSApplication.ModalResponse {
+        let alert = NSAlert(); alert.messageText = "Save \(document.title) before closing?"
+        alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Discard")
+        return alert.runModal()
+    }
+    @discardableResult func close(_ document: EditorDocument,
+                                  confirm: @MainActor (EditorDocument) -> NSApplication.ModalResponse = Workspace.confirmClose) -> Bool {
+        guard documents.contains(where: { $0 === document }) else { return false }
         if (document.url == nil || document.autosaveSuspended) && (!document.text.isEmpty || !document.comments.threads.isEmpty || document.isDirty) {
-            let alert = NSAlert(); alert.messageText = "Save \(document.title) before closing?"
-            alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Discard")
-            let response = alert.runModal()
-            if response == .alertSecondButtonReturn { return }
-            if response == .alertFirstButtonReturn { save(document); if document.url == nil || document.isDirty { return } }
+            let response = confirm(document)
+            if response != .alertFirstButtonReturn && response != .alertThirdButtonReturn { return false }
+            if response == .alertFirstButtonReturn { save(document); if document.url == nil || document.isDirty { return false } }
         } else if document.isDirty {
-            do { try document.save() } catch { self.error = error.localizedDescription; return }
+            do { try document.save() } catch { self.error = error.localizedDescription; return false }
         }
+        document.saveTask?.cancel(); document.renderTask?.cancel()
         persistLayout(document)
         document.stopWatching()
         document.onNavigate = nil
@@ -396,6 +402,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         documents.removeAll { $0.id == document.id }
         if activeID == document.id { activeID = documents.isEmpty ? nil : documents[min(index, documents.count - 1)].id }
         scheduleRecovery()
+        return true
     }
     func toggleFiles() { guard let active else { return }; active.layout.showFiles.toggle(); scheduleRecovery() }
     func toggleSplit() { objectWillChange.send(); active?.layout.toggleSplit(); scheduleRecovery() }

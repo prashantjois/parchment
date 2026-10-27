@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.14 | 15 | 2026-10-27 | Current release | Added interactive setup questions to the command-line installer. |
+| 0.1.15 | 16 | 2026-10-27 | Current release | Added tab reordering and context-menu actions to close groups of tabs. |
+| 0.1.14 | 15 | 2026-10-27 | `3ef38ef` | Added interactive setup questions to the command-line installer. |
 | 0.1.13 | 14 | 2026-10-27 | `f354621` | Added a command-line installer and documented macOS security prompts. |
 | 0.1.12 | 13 | 2026-10-27 | `1e977f1`, tag `v0.1.12` | Moved comment and review instructions from the README to the Help menu. |
 | 0.1.11 | 12 | 2026-10-27 | `a5433c1` | Moved editing instructions from the README to the Help menu. |
@@ -19,6 +20,14 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.15
+
+- Added native tab dragging with an insertion marker before or after the target tab.
+- Tab order persists across restarts without changing the active tab, unsaved edits, comments, or view state.
+- Added Close Tab, Close Tabs Before, Close Tabs After, and Close All Tabs to each tab's context menu.
+- Bulk close uses the existing save prompts and stops on cancellation or a save failure.
+- Updated the bundled Editing Guide with tab controls.
 
 ## 0.1.14
 

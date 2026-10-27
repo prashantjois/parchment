@@ -13,6 +13,7 @@ import ParchmentCore
         if CommandLine.arguments.contains("--check-themes") { ThemeChecks.run() }
         if CommandLine.arguments.contains("--check-storage") { StorageChecks.run() }
         if CommandLine.arguments.contains("--check-editor") { EditorChecks.run() }
+        if CommandLine.arguments.contains("--check-tabs") { TabChecks.run() }
         if let index = CommandLine.arguments.firstIndex(of: "--export-comments") {
             guard CommandLine.arguments.count > index + 1 else { fputs("Usage: Parchment --export-comments FILE [--include-resolved]\n", stderr); exit(2) }
             do {
@@ -158,8 +159,7 @@ struct WorkspaceView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(workspace.documents) { document in
-                            DocumentTab(document: document, selected: workspace.activeID == document.id,
-                                        activate: { workspace.activeID = document.id; workspace.scheduleRecovery() }, close: { workspace.close(document) }, comment: { workspace.beginFileComment(document) })
+                            DocumentTab(document: document, workspace: workspace)
                         }
                         Spacer(minLength: 0)
                     }
@@ -192,29 +192,6 @@ struct WorkspaceView: View {
             Button("OK", role: .cancel) { workspace.error = nil }
         } message: { Text(workspace.error ?? "") }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in workspace.persist() }
-    }
-}
-
-struct DocumentTab: View {
-    @ObservedObject var document: EditorDocument
-    var selected: Bool
-    var activate: () -> Void
-    var close: () -> Void
-    var comment: () -> Void
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
-            Text(document.title).font(.system(size: 12, weight: selected ? .semibold : .regular)).lineLimit(1)
-                .background(TabCommentHover(action: comment))
-            if document.isDirty { Circle().fill(.secondary).frame(width: 5, height: 5) }
-            Button(action: comment) { Image(systemName: "text.bubble").font(.system(size: 11)).padding(3) }
-                .buttonStyle(.plain).help("Add File Comment (⌃⇧M)").accessibilityLabel("Add a comment to \(document.title)")
-            Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).padding(4) }.buttonStyle(.plain).help("Close Tab (⌘W)")
-        }.padding(.horizontal, 14).frame(height: 38).frame(minWidth: 130, maxWidth: 240)
-            .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
-            .overlay(alignment: .bottom) { if selected { Rectangle().fill(Color.accentColor).frame(height: 2) } }
-            .contentShape(Rectangle()).onTapGesture(perform: activate).help(document.url?.path ?? "Unsaved document")
-            .contextMenu { FileLocationMenu(name: document.title, url: document.url) }
     }
 }
 
