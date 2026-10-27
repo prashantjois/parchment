@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euo pipefail
+
+if [[ "${3:-/}" != "/" ]]; then
+    printf 'The agent skill requires installation on the current startup volume.\n' >&2
+    exit 1
+fi
+console_user="$(/usr/bin/stat -f '%Su' /dev/console)"
+case "$console_user" in
+    root|loginwindow|_mbsetupuser|"")
+        printf 'Log in to a Mac user account before installing the agent skill.\n' >&2
+        exit 1 ;;
+esac
+console_uid="$(/usr/bin/id -u "$console_user")"
+script_directory="$(cd "$(dirname "$0")" && pwd)"
+# Read package resources as the installer, but write only as the logged-in user.
+/bin/launchctl asuser "$console_uid" /usr/bin/sudo -n -H -u "$console_user" \
+    /bin/bash -c "$(cat "$script_directory/install-skill.sh")" \
+    < "$script_directory/SKILL.md"

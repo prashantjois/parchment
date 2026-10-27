@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+if [[ "${3:-/}" != "/" ]]; then
+    printf 'Default app settings require the current startup volume.\n' >&2
+    exit 1
+fi
+console_user="$(/usr/bin/stat -f '%Su' /dev/console)"
+case "$console_user" in
+    root|loginwindow|_mbsetupuser|"")
+        printf 'Log in to a Mac user account before changing the default Markdown app.\n' >&2
+        exit 1 ;;
+esac
+console_uid="$(/usr/bin/id -u "$console_user")"
+app_directory="/Applications/Parchment.app"
+registrar="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+/bin/launchctl asuser "$console_uid" /usr/bin/sudo -n -H -u "$console_user" \
+    "$registrar" -f "$app_directory"
+/bin/launchctl asuser "$console_uid" /usr/bin/sudo -n -H -u "$console_user" \
+    "$app_directory/Contents/MacOS/ParchmentSetup" --set-markdown-default

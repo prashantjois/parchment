@@ -171,6 +171,7 @@ struct DocumentTab: View {
             .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
             .overlay(alignment: .bottom) { if selected { Rectangle().fill(Color.accentColor).frame(height: 2) } }
             .contentShape(Rectangle()).onTapGesture(perform: activate).help(document.url?.path ?? "Unsaved document")
+            .contextMenu { FileLocationMenu(name: document.title, url: document.url) }
     }
 }
 

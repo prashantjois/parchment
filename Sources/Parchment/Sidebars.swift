@@ -71,6 +71,9 @@ struct BrowserRow: View {
                 }.padding(.vertical, 6).padding(.horizontal, 5).contentShape(Rectangle())
                     .background(document.url == entry.url ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 5))
             }.buttonStyle(.plain)
+                .contextMenu {
+                    FileLocationMenu(name: entry.url.lastPathComponent, url: entry.url, isDirectory: entry.directory)
+                }
             if entry.directory && expanded {
                 ForEach(children) { child in BrowserRow(entry: child, document: document, open: open).padding(.leading, 14) }
             }

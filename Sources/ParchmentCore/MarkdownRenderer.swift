@@ -21,8 +21,18 @@ public enum MarkdownRenderer {
     }
 
     public static func render(_ source: String, baseURL: URL? = nil) -> RenderedDocument {
-        let document = Document(parsing: source)
         let lines = source.components(separatedBy: "\n")
+        var renderedLines = lines
+        let firstLine = lines[0].hasPrefix("\u{FEFF}") ? String(lines[0].dropFirst()) : lines[0]
+        if firstLine.trimmingCharacters(in: .whitespacesAndNewlines) == "---",
+           let closing = lines.indices.dropFirst().first(where: {
+               let delimiter = lines[$0].trimmingCharacters(in: .whitespacesAndNewlines)
+               return delimiter == "---" || delimiter == "..."
+           }) {
+            // Keep line numbers unchanged so selections and comments map to the raw source.
+            for index in 0...closing { renderedLines[index] = "" }
+        }
+        let document = Document(parsing: renderedLines.joined(separator: "\n"))
         var lineOffsets = [0]
         for line in lines.dropLast() { lineOffsets.append(lineOffsets.last! + (line as NSString).length + 1) }
         var headings: [DocumentHeading] = []

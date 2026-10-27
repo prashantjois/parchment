@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# For an offline volume, Launch Services will register the app on its first launch.
+# This script runs only when the URL registration checkbox is selected.
 [[ "${3:-/}" == "/" ]] || exit 0
 app_directory="/Applications/Parchment.app"
 [[ -d "$app_directory" ]] || exit 0

@@ -238,6 +238,32 @@ final class CoreTests {
         let bold = (source as NSString).range(of: "bold")
         expectTrue(result.html.contains("data-start=\"\(bold.location)\" data-end=\"\(bold.location + bold.length)\" data-precise=\"1\">bold"))
     }
+    func testFrontMatterIsHiddenWithOriginalSourceOffsets() {
+        for newline in ["\n", "\r\n"] {
+            for closing in ["---", "..."] {
+                let source = ["\u{FEFF}---", "name: secret-metadata", "description: |", "  # Hidden heading 📝", closing, "# Visible heading", "", "Comment on café 📝."].joined(separator: newline)
+                let rendered = MarkdownRenderer.render(source)
+                expectFalse(rendered.html.contains("secret-metadata"))
+                expectFalse(rendered.html.contains("Hidden heading"))
+                expectEqual(rendered.headings.map(\.title), ["Visible heading"])
+                expectEqual(rendered.headings.first?.location, (source as NSString).range(of: "# Visible heading").location)
+                let range = (source as NSString).range(of: "Comment on café 📝.")
+                expectTrue(rendered.html.contains("data-start=\"\(range.location)\" data-end=\"\(NSMaxRange(range))\" data-precise=\"1\""))
+            }
+        }
+        expectEqual(MarkdownRenderer.render("---\nname: hidden\n---").html, "")
+        expectEqual(MarkdownRenderer.render("").html, "")
+    }
+    func testFrontMatterDetectionPreservesOrdinaryMarkdown() {
+        let incomplete = MarkdownRenderer.render("---\nname: still visible\n# Heading")
+        expectTrue(incomplete.html.contains("still visible"))
+        expectTrue(incomplete.html.contains("<hr"))
+        let ordinary = MarkdownRenderer.render("# Heading\n\n---\n\nVisible\n\n---")
+        expectTrue(ordinary.html.contains("Visible"))
+        expectEqual(ordinary.headings.map(\.title), ["Heading"])
+        let fenced = MarkdownRenderer.render("```yaml\n---\nname: visible example\n---\n```")
+        expectTrue(fenced.html.contains("visible example"))
+    }
     func testRendererHandlesTablesTasksLinksAndCode() {
         let source = """
         - [x] Done
@@ -310,6 +336,8 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testToolbarViewButtonWorksFromEveryMode", suite.testToolbarViewButtonWorksFromEveryMode),
             ("testRendererIncludesSixHeadingLevelsAndSourceMapping", suite.testRendererIncludesSixHeadingLevelsAndSourceMapping),
             ("testRendererHandlesTablesTasksLinksAndCode", suite.testRendererHandlesTablesTasksLinksAndCode),
+            ("testFrontMatterIsHiddenWithOriginalSourceOffsets", suite.testFrontMatterIsHiddenWithOriginalSourceOffsets),
+            ("testFrontMatterDetectionPreservesOrdinaryMarkdown", suite.testFrontMatterDetectionPreservesOrdinaryMarkdown),
             ("testRendererDoesNotExecuteRawHTMLOrUnsafeLinks", suite.testRendererDoesNotExecuteRawHTMLOrUnsafeLinks),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
