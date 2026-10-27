@@ -375,6 +375,41 @@ final class CoreTests {
         expectFalse(html.contains("href=\"parchment://open"))
         expectFalse(html.contains("href=\"file://server"))
     }
+    func testCommentReadStateTracksRepliesWithoutChangingDiscussion() throws {
+        var thread = CommentThread(anchor: anchor("A sentence", quote: "sentence"), body: "My comment", author: "Reader")
+        var state = CommentReadState()
+        expectFalse(state.isUnread(thread, reader: "Reader"))
+        var reply = CommentEvent(kind: .reply, author: "Agent", body: "A new reply")
+        reply.origin = "agent"; thread.events.append(reply)
+        expectTrue(state.isUnread(thread, reader: "Reader"))
+        expectTrue(state.isUnread(reply, in: thread, reader: "Reader"))
+        state.markRead(thread)
+        expectFalse(state.isUnread(thread, reader: "Reader"))
+        state.markUnread(thread)
+        let restored = try JSONDecoder().decode(CommentReadState.self, from: JSONEncoder().encode(state))
+        expectTrue(restored.isUnread(thread, reader: "Reader"))
+        state.markRead(thread)
+        let another = CommentEvent(kind: .reply, author: "Agent", body: "Another reply")
+        thread.events.append(another)
+        expectTrue(state.isUnread(thread, reader: "Reader"))
+        expectFalse(state.isUnread(reply, in: thread, reader: "Reader"))
+        expectTrue(state.isUnread(another, in: thread, reader: "Reader"))
+        expectEqual(thread.events.count, 3)
+    }
+    func testPendingRepliesDoNotBecomeUnreadUntilPublished() {
+        var thread = CommentThread(anchor: anchor("A sentence", quote: "sentence"), body: "My comment", author: "Reader")
+        var reply = CommentEvent(kind: .reply, author: "Agent", body: "Pending reply", reviewID: UUID())
+        reply.origin = "agent"; thread.events.append(reply)
+        var state = CommentReadState()
+        expectFalse(state.isUnread(thread, reader: "Reader"))
+        state.markRead(thread)
+        thread.events[1].publishedAt = Date()
+        expectTrue(state.isUnread(thread, reader: "Reader"))
+        var draft = CommentThread(anchor: thread.anchor, body: "Pending comment", author: "Agent", reviewID: UUID())
+        draft.events.append(reply)
+        state.markUnread(draft)
+        expectFalse(state.isUnread(draft, reader: "Reader"))
+    }
     func testCodeAndAttributeValuesAreEscaped() {
         let html = MarkdownRenderer.render("`<img src=x onerror=bad>`\n\n[link](https://example.com/?a=1&b=2)").html
         expectTrue(html.contains("&lt;img")); expectFalse(html.contains("<img src=x"))
@@ -430,6 +465,8 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets", suite.testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets),
             ("testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole", suite.testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole),
             ("testRendererPreservesLocalAndExternalNavigationLinks", suite.testRendererPreservesLocalAndExternalNavigationLinks),
+            ("testCommentReadStateTracksRepliesWithoutChangingDiscussion", suite.testCommentReadStateTracksRepliesWithoutChangingDiscussion),
+            ("testPendingRepliesDoNotBecomeUnreadUntilPublished", suite.testPendingRepliesDoNotBecomeUnreadUntilPublished),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
         for (name, test) in tests {

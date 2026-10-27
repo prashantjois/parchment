@@ -64,7 +64,9 @@ The composer offers **Comment Now** for immediate publication and **Start a Revi
 
 The Comments sidebar shows the pending count and a **Finish Review** button. The submission sheet lists pending feedback and accepts an optional summary. **Submit Review** publishes all pending comments and replies together. Pending drafts can be edited or deleted. **Discard** removes the pending review without removing published discussion.
 
-Each comment starts one flat reply thread. Threads support resolution, reopening, history, and manual reattachment after text changes. The Open, Pending, Resolved, and All filters separate discussion states. The All view includes submitted review summaries and discarded-review history.
+Each comment starts one flat reply thread. Threads support resolution, reopening, history, and manual reattachment after text changes. The Open, Unread, Pending, Resolved, and All filters separate discussion states. The All view includes submitted review summaries and discarded-review history.
+
+New replies from agents or other reviewers mark a thread unread. Unread threads appear first with a blue highlight, and new messages carry a **New reply** label. Interacting with a thread marks it read. Use **Mark as Unread** on the card or its context menu to restore unread status. Unread replies remain visible even when their threads are resolved. Read state persists on this Mac and stays separate from agent feedback acknowledgement.
 
 Pending reviews survive autosave and session restoration. Agent exports exclude pending comments, pending replies, and unsubmitted reviews, including exports with `--include-resolved`.
 

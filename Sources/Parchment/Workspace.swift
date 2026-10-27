@@ -15,11 +15,12 @@ enum DocumentSaveError: LocalizedError {
 }
 
 @MainActor final class EditorDocument: ObservableObject, @preconcurrency Identifiable {
-    @Published var id: UUID
+    @Published var id: UUID { didSet { if id != oldValue { loadCommentReadState() } } }
     @Published var url: URL?
     @Published var text: String
     @Published var layout: FileLayout
     @Published var comments: CommentFile
+    @Published var commentReadState = CommentReadState()
     @Published var rendered: RenderedDocument
     @Published var selection = NSRange(location: 0, length: 0)
     @Published var jump: JumpRequest?
@@ -55,8 +56,45 @@ enum DocumentSaveError: LocalizedError {
         browserRoot = url?.deletingLastPathComponent() ?? FileManager.default.homeDirectoryForCurrentUser
         self.comments.documentID = self.id
         lastDiskText = url == nil ? nil : text
+        loadCommentReadState()
     }
     var title: String { url?.lastPathComponent ?? "Untitled" }
+    private var readStateKey: String { "comments.read:\(id.uuidString)" }
+    private func loadCommentReadState() {
+        commentReadState = UserDefaults.standard.data(forKey: readStateKey)
+            .flatMap { try? JSONDecoder().decode(CommentReadState.self, from: $0) } ?? CommentReadState()
+    }
+    func isUnread(_ thread: CommentThread) -> Bool { commentReadState.isUnread(thread, reader: NSFullUserName()) }
+    func isUnread(_ message: CommentEvent, in thread: CommentThread) -> Bool {
+        commentReadState.isUnread(message, in: thread, reader: NSFullUserName())
+    }
+    var unreadThreadCount: Int { comments.threads.filter(isUnread).count }
+    func markThreadRead(_ thread: CommentThread) {
+        var state = commentReadState; state.markRead(thread); persistReadState(state)
+    }
+    func markThreadUnread(_ thread: CommentThread) {
+        var state = commentReadState; state.markUnread(thread); persistReadState(state)
+    }
+    private func persistReadState(_ state: CommentReadState) {
+        guard state != commentReadState else { return }
+        commentReadState = state
+        if let data = try? JSONEncoder().encode(state) { UserDefaults.standard.set(data, forKey: readStateKey) }
+    }
+    func visibleCommentThreads(filter: String) -> [CommentThread] {
+        comments.threads.enumerated().filter { _, thread in
+            switch filter {
+            case "Unread": return isUnread(thread)
+            case "Pending": return thread.isPending || thread.messages.contains(where: \.isPending)
+            case "Resolved": return !thread.isPending && thread.isResolved
+            case "Open": return !thread.isPending && (!thread.isResolved || isUnread(thread))
+            default: return true
+            }
+        }.sorted { lhs, rhs in
+            let left = isUnread(lhs.element), right = isUnread(rhs.element)
+            if left != right { return left }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
+    }
     func changed(_ value: String) {
         text = value; isDirty = true
         renderTask?.cancel()
@@ -169,6 +207,7 @@ enum DocumentSaveError: LocalizedError {
     func discardReview() { comments.discardReview(); isDirty = true; scheduleSave() }
     func addReply(_ body: String, to threadID: UUID, pending: Bool) {
         guard let thread = comments.threads.first(where: { $0.id == threadID }), !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        markThreadRead(thread)
         let reviewID = thread.isPending ? thread.reviewID : (pending ? comments.startReview(author: NSFullUserName()) : nil)
         append(CommentEvent(kind: .reply, author: NSFullUserName(), body: body, reviewID: reviewID), to: threadID)
     }
@@ -188,9 +227,11 @@ enum DocumentSaveError: LocalizedError {
     }
     func append(_ event: CommentEvent, to thread: UUID) {
         guard let index = comments.threads.firstIndex(where: { $0.id == thread }) else { return }
+        if event.origin != "agent", event.author == NSFullUserName() { markThreadRead(comments.threads[index]) }
         comments.threads[index].events.append(event); isDirty = true; scheduleSave()
     }
     func selectThread(_ thread: CommentThread) {
+        markThreadRead(thread)
         selectedThread = thread.id; layout.showRight = true; layout.rightPanel = .comments
         if let range = thread.anchor.locate(in: text).range { reveal(range.nsRange) }
         onChange?()

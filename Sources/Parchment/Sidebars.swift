@@ -112,20 +112,16 @@ struct CommentsSidebar: View {
     @ViewState<Bool> private var discardReview = false
     @ViewState<Bool> private var disconnectAgent = false
     var visibleThreads: [CommentThread] {
-        document.comments.threads.filter {
-            switch filter {
-            case "Pending": return $0.isPending || $0.messages.contains(where: \.isPending)
-            case "Resolved": return !$0.isPending && $0.isResolved
-            case "Open": return !$0.isPending && !$0.isResolved
-            default: return true
-            }
-        }
+        document.visibleCommentThreads(filter: filter)
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Label("Comments", systemImage: "text.bubble").font(.headline)
                 Spacer()
+                if document.unreadThreadCount > 0 {
+                    Button("\(document.unreadThreadCount) unread") { filter = "Unread" }.font(.caption).buttonStyle(.borderless)
+                }
                 Button(action: beginComment) { Image(systemName: "plus") }.buttonStyle(.borderless).disabled(document.selection.length == 0).help("Add Comment (⌃M)")
             }.padding(14)
             if document.integrationAttachment["status"].string == "attached" {
@@ -163,7 +159,7 @@ struct CommentsSidebar: View {
             } else {
                 Button("Start a Review") { document.startReview(); filter = "Pending" }.buttonStyle(.borderless).padding(.horizontal, 14).padding(.bottom, 12)
             }
-            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.segmented).padding(.horizontal, 10).padding(.bottom, 10)
+            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Unread").tag("Unread"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.segmented).controlSize(.small).padding(.horizontal, 10).padding(.bottom, 10)
             Divider()
             ScrollViewReader { reader in
                 ScrollView {
@@ -220,6 +216,30 @@ struct ThreadCard: View {
     var match: AnchorMatch { thread.anchor.locate(in: document.text) }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if !thread.isPending {
+                HStack {
+                    if document.isUnread(thread) { Label("Unread", systemImage: "circle.fill").foregroundStyle(.blue).font(.caption.bold()) }
+                    Spacer()
+                    Button(document.isUnread(thread) ? "Mark as Read" : "Mark as Unread") {
+                        if document.isUnread(thread) { document.markThreadRead(thread) } else { document.markThreadUnread(thread) }
+                    }.buttonStyle(.borderless).font(.caption)
+                }
+            }
+            discussion.simultaneousGesture(TapGesture().onEnded { document.markThreadRead(thread) })
+        }.padding(12)
+            .background(document.isUnread(thread) ? Color.blue.opacity(0.10) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(document.isUnread(thread) ? Color.blue : thread.id == document.selectedThread ? Color.accentColor : Color.secondary.opacity(0.15), lineWidth: 1))
+            .contextMenu {
+                if !thread.isPending {
+                    Button("Mark as Read") { document.markThreadRead(thread) }
+                    Button("Mark as Unread") { document.markThreadUnread(thread) }
+                }
+            }
+            .onChange(of: reply) { _, value in if !value.isEmpty { document.markThreadRead(thread) } }
+            .onChange(of: history) { _, value in if value { document.markThreadRead(thread) } }
+    }
+    var discussion: some View {
+        VStack(alignment: .leading, spacing: 10) {
             if thread.isPending { Label("Pending review", systemImage: "clock").font(.caption.bold()).foregroundStyle(.orange) }
             Button { document.selectThread(thread) } label: {
                 HStack(alignment: .top) {
@@ -241,6 +261,7 @@ struct ThreadCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(message.author).font(.caption.bold())
+                        if document.isUnread(message, in: thread) { Text(message.kind == .reply ? "New reply" : "New").font(.caption2.bold()).foregroundStyle(.blue) }
                         Spacer()
                         Text(message.timestamp, style: .date).font(.caption2).foregroundStyle(.secondary)
                     }
@@ -291,9 +312,7 @@ struct ThreadCard: View {
                     }
                 }.padding(.top, 6)
             }.font(.caption).foregroundStyle(.secondary)
-        }.padding(12)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(thread.id == document.selectedThread ? Color.accentColor : Color.secondary.opacity(0.15), lineWidth: 1))
+        }
     }
 }
 
