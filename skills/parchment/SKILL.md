@@ -65,7 +65,9 @@ The app runs the dispatcher independently of an active agent turn. A separately 
 
 ## Link to Markdown documents
 
-When presenting a local Markdown document, use a `parchment://` hyperlink by default. In cmux, this opens Parchment through macOS and preserves cmux's other file previews.
+When presenting a local Markdown document, prefer a `parchment://` hyperlink if the client preserves custom URL schemes. Such links open Parchment through macOS.
+
+Some terminal chat renderers emit hyperlinks only for HTTP(S) or local file targets. A custom-scheme URL can appear as plain text, and cmux can detect its Markdown path as a file preview. Do not promise that a chat link opens Parchment without verifying the client behavior. If a reported click opens another viewer, use `open_document` to focus Parchment directly. Offer a macOS `open` command as a manual fallback. Do not change unrelated terminal preview settings to work around the chat renderer.
 
 Prefer the `open_url` returned by `open_document`, `get_document`, or `list_documents`. Unsaved tabs have no file link until saved. Keep their document IDs for MCP calls.
 
@@ -84,7 +86,7 @@ Example Markdown output:
 [Open design notes in Parchment](parchment://Users/me/Documents/Design%20notes.md?line=42)
 ```
 
-For terminal output, use an OSC 8 hyperlink if the renderer does not preserve custom-scheme Markdown links. This makes the target explicit instead of relying on URL detection. For example:
+For output written directly to a terminal, an OSC 8 hyperlink makes the target explicit. A chat renderer can strip OSC 8 sequences from tool output, so this is not a guaranteed fallback inside chat. For a standalone terminal program:
 
 ```python
 from pathlib import Path
@@ -95,7 +97,15 @@ url = "parchment://" + quote(path.removeprefix("/"), safe="/")
 print(f"\033]8;;{url}\033\\Open design notes in Parchment\033]8;;\033\\")
 ```
 
-In cmux, Cmd-click the hyperlink. The app must be installed or registered with macOS. The Parchment build script registers its app bundle.
+In a terminal that preserves the complete OSC 8 target, Cmd-click the hyperlink. The app must be installed or registered with macOS. The Parchment build script registers its app bundle.
+
+For a client that strips custom links, offer this command:
+
+```sh
+open 'parchment://Users/me/notes.md?line=42'
+```
+
+Document links select Rendered mode and preserve live unsaved edits. Opening a file through MCP remains a separate operation from clicking a link.
 
 Links open or focus an existing file. They do not create files, apply edits, or attach an agent. Use MCP for those operations. Never put session tokens or ownership parameters in a link. Web URLs and files on remote hosts remain ordinary links.
 

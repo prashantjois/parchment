@@ -327,10 +327,13 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
                 active?.browserRoot = file; active?.layout.showFiles = true
             } else {
                 open(file)
-                if let fragment = url.fragment, let document = documents.first(where: { $0.url == file }),
-                   let heading = document.rendered.headings.first(where: { $0.id == (fragment.removingPercentEncoding ?? fragment) }) {
-                    document.layout.cursorLocation = heading.location
-                    document.reveal(NSRange(location: heading.location, length: 0))
+                if let document = documents.first(where: { $0.url == file }) {
+                    document.layout.showSinglePane(.rendered)
+                    if let fragment = url.fragment,
+                       let heading = document.rendered.headings.first(where: { $0.id == (fragment.removingPercentEncoding ?? fragment) }) {
+                        document.layout.cursorLocation = heading.location
+                        document.reveal(NSRange(location: heading.location, length: 0))
+                    }
                 }
             }
             scheduleRecovery(); return
@@ -340,6 +343,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
             open(link.fileURL)
             let canonical = link.fileURL.resolvingSymlinksInPath()
             guard let document = documents.first(where: { $0.url == canonical }) else { return }
+            document.layout.showSinglePane(.rendered)
             if let offset = link.location(in: document.text) {
                 document.layout.cursorLocation = offset
                 document.reveal(NSRange(location: offset, length: 0))

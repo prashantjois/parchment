@@ -119,12 +119,15 @@ import ParchmentCore
             var target = URLComponents(url: linked, resolvingAgainstBaseURL: false)!
             target.fragment = "section"
             navigation.openLink(target.url!)
-            expect(workspace.active?.url == linked && workspace.active?.jump?.range.location == 10, "local preview links open the target file and heading")
+            expect(workspace.active?.url == linked && workspace.active?.jump?.range.location == 10 &&
+                   workspace.active?.layout.mode == .rendered, "local preview links open the target file and heading in Rendered mode")
             workspace.active!.changed("Local target edits")
+            workspace.active!.layout.mode = .split
             navigation.openLink(linked)
-            expect(workspace.active?.text == "Local target edits" && workspace.documents.filter { $0.url == linked }.count == 1, "local links reuse existing tabs and preserve unsaved edits")
+            expect(workspace.active?.text == "Local target edits" && workspace.documents.filter { $0.url == linked }.count == 1 &&
+                   workspace.active?.layout.mode == .rendered, "local links switch Split tabs to Rendered and preserve unsaved edits")
             navigation.openLink(try DocumentLink.url(for: path, line: 1))
-            expect(workspace.active?.id == external.id, "Parchment links navigate inside the current workspace")
+            expect(workspace.active?.id == external.id && external.layout.mode == .rendered, "Parchment links select Rendered mode inside the current workspace")
             navigation.openLink(directory)
             expect(external.browserRoot.path == directory.resolvingSymlinksInPath().path && external.layout.showFiles, "folder links navigate the file browser")
             let browser = URL(string: "https://example.com/guide#section")!
@@ -138,9 +141,9 @@ import ParchmentCore
             navigation.openLink(target.url!)
             expect(workspace.backHistory.count == 1 && workspace.canGoBack && !workspace.canGoForward, "a file-and-heading link records one navigation step")
             workspace.goBack()
-            expect(workspace.active?.id == external.id && external.selection == NSRange(location: 4, length: 2) && external.layout.sourceScroll == 0.35 && external.layout.renderedScroll == 0.4 && external.jump?.restoreScroll == true, "Back restores the previous file, selection, and both scroll positions")
+            expect(workspace.active?.id == external.id && external.selection == NSRange(location: 4, length: 2) && external.layout.mode == .split && external.layout.sourceScroll == 0.35 && external.layout.renderedScroll == 0.4 && external.jump?.restoreScroll == true, "Back restores the previous file, mode, selection, and both scroll positions")
             workspace.goForward()
-            expect(workspace.active?.url == linked && workspace.active?.text == "Local target edits", "Forward returns to the live target without replacing unsaved text")
+            expect(workspace.active?.url == linked && workspace.active?.text == "Local target edits" && workspace.active?.layout.mode == .rendered, "Forward returns to the rendered target without replacing unsaved text")
             let destination = workspace.active!
             destination.reveal(NSRange(location: 1, length: 0))
             workspace.goBack()

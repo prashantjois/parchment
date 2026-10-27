@@ -142,9 +142,17 @@ The loadable [Parchment agent skill](skills/parchment/SKILL.md) makes Parchment 
 
 Links such as `parchment://Users/me/notes.md?line=42` open or focus a local file in Parchment. The path after `parchment://` names an absolute local file. The optional line number is one-based. Encode spaces as `%20` and reserved characters such as `+`, `#`, `%`, and `?`. Existing `parchment://open?path=...&line=42` links also work.
 
-In cmux, Cmd-click a Parchment hyperlink to open it without changing cmux's file-preview settings. Terminal programs can emit OSC 8 hyperlinks when their Markdown renderer does not support custom URL schemes. The [agent skill](skills/parchment/SKILL.md) includes examples.
+A client must preserve the complete custom URL for a Parchment link to work. Some terminal chat renderers omit custom-scheme hyperlinks. cmux can then detect the Markdown file path and open its own preview. An inline code span does not guarantee a clickable Parchment link.
 
-The build script registers the scheme with macOS. Links preserve unsaved edits and existing agent ownership. They open files but do not create them or attach conversations. MCP document responses include an `open_url` for saved files.
+If a terminal link opens in cmux, open the document through Parchment's MCP tools or run:
+
+```sh
+open 'parchment://Users/me/notes.md?line=42'
+```
+
+Standalone terminal programs can emit OSC 8 hyperlinks with the complete URL. A chat renderer can still strip these control sequences from tool output. The [agent skill](skills/parchment/SKILL.md) includes an example for direct terminal output.
+
+The build script registers the scheme with macOS. Document links select Rendered mode, including when the target tab was open in Raw or Split mode. They preserve unsaved edits and existing agent ownership. Back restores the previous mode and position. Links open files but do not create them or attach conversations. MCP document responses include an `open_url` for saved files.
 
 ## Current limits
 

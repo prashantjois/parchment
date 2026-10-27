@@ -10,7 +10,7 @@ Raw mode provides native text editing, selection, cut/copy/paste, undo/redo, fin
 
 The file browser starts in the current file's folder. An unsaved document starts in the user's home folder. The browser supports expandable folders and parent navigation.
 
-In Rendered and Split modes, clicking a local file link opens or selects its tab. Heading fragments navigate to the heading in the target file. Folder links open the file browser. Web links open in the system's default browser.
+In Rendered and Split modes, clicking a local file link opens or selects its tab in Rendered mode. External parchment:// document links also select Rendered mode. Links preserve live edits even when the target tab was open in Raw or Split mode. Heading fragments navigate to the heading in the target file. Folder links open the file browser. Web links open in the system's default browser.
 
 The Back and Forward toolbar buttons navigate through files, tabs, heading jumps, and folder changes. They restore the previous selection, view mode, and scroll positions without replacing unsaved text. Use `⌘[` / `⌘]`, `⌘⌥←` / `⌘⌥→`, mouse back/forward buttons, or horizontal swipe gestures. History lasts for the current app session.
 

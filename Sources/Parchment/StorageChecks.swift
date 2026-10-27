@@ -59,10 +59,14 @@ import ParchmentCore
             check(restored.active?.layout.rightWidth == 333 && restored.active?.layout.mode == .split, "session restores active tab and layout")
             check(restored.active?.comments.threads.first?.events.count == 4, "session restores reply and resolution history")
             workspace.openIncomingURL(try DocumentLink.url(for: second, line: 2))
-            check(workspace.active?.id == secondDocument.id && workspace.documents.count == count && secondDocument.jump?.range.location == 9, "document links reuse tabs and navigate to a line")
+            check(workspace.active?.id == secondDocument.id && workspace.documents.count == count &&
+                  secondDocument.jump?.range.location == 9 && secondDocument.layout.mode == .rendered,
+                  "document links reuse tabs, select Rendered mode, and navigate to a line")
             secondDocument.changed("# Unsaved changes\n")
+            secondDocument.layout.showSinglePane(.raw)
             workspace.openIncomingURL(try DocumentLink.url(for: second))
-            check(secondDocument.text == "# Unsaved changes\n" && secondDocument.isDirty, "document links preserve live unsaved edits")
+            check(secondDocument.text == "# Unsaved changes\n" && secondDocument.isDirty && secondDocument.layout.mode == .rendered,
+                  "links switch an existing Raw tab to Rendered without replacing live unsaved edits")
             workspace.openIncomingURL(URL(string: "parchment://open?path=/tmp/a.md&line=0")!)
             check(workspace.error != nil && workspace.documents.count == count && workspace.active?.id == secondDocument.id, "invalid document links leave tabs unchanged")
             workspace.error = nil
