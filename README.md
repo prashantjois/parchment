@@ -79,7 +79,11 @@ The CLI reads saved files. It does not send data to an agent or start an agent. 
 
 The bundled `ParchmentMCP` helper connects documents to existing agent conversations. Agents can open the app, list live tabs, attach files, receive published feedback, and apply revision-checked edits.
 
-One conversation owns each document. Pending reviews stay private until submission. Ownership, feedback, and acknowledgements survive restarts. The Comments sidebar shows the owner and offers an explicit disconnect action.
+Only one agent session can own a document. If agents attach concurrently, one becomes the owner; the others receive `DOCUMENT_ALREADY_ATTACHED`. Explicit handoff transfers ownership and unhandled feedback. Other agents can read the document and published comments. Reading the feedback queue and applying edits require owner credentials.
+
+Published comments queue while the agent handles earlier feedback. Each submitted review forms one batch. Feedback stays pending until the agent acknowledges it. Pending reviews stay private until submission. Ownership, feedback, and acknowledgements survive restarts.
+
+Each comment has an event ID and thread ID. Each notification has a stable delivery ID for retries. Runtime acceptance means that the notification reached the agent's input queue. Fetching means that the agent retrieved feedback. Acknowledgement means that the agent handled the feedback. Fetching does not identify the comment currently in progress. The Comments sidebar counts feedback awaiting acknowledgement. It also shows the owner and offers an explicit disconnect action.
 
 Configure your MCP client with `dist/Parchment.app/Contents/MacOS/ParchmentMCP` as an absolute executable path. See [MCP setup and workflow](docs/mcp.md).
 
