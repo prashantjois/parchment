@@ -5,6 +5,7 @@ import itertools
 import os
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -101,3 +102,31 @@ for arguments in [('--unknown',), ('--package',), ('--version',),
     assert run(*arguments).returncode != 0, arguments
 assert run('--help').returncode == 0
 print('PASS help and invalid arguments without administrator access')
+
+with tempfile.TemporaryDirectory(prefix='parchment-checkout-install-') as temporary:
+    checkout = Path(temporary)
+    (checkout / 'scripts').mkdir()
+    (checkout / 'dist').mkdir()
+    (checkout / 'Package.swift').write_text('// Source checkout fixture\n')
+    local_script = checkout / 'scripts/install.sh'
+    shutil.copyfile(script, local_script)
+    # Use the real package version and architecture; place an older file beside it.
+    parts = package.stem.split('-')
+    version = parts[1]
+    (checkout / 'scripts/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': version}))
+    local_package = checkout / 'dist' / package.name
+    shutil.copyfile(package, local_package)
+    shutil.copyfile(str(package) + '.sha256', str(local_package) + '.sha256')
+    (checkout / 'dist/Parchment-0.0.1-arm64.pkg').write_bytes(b'Older build: never select this file')
+    result = subprocess.run(['bash', str(local_script), '--yes', '--dry-run'], cwd='/',
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert 'Using the local installer for checkout version ' + version in result.stderr
+    assert 'Verified ' + package.name in result.stderr and 'Downloading' not in result.stderr
+    assert selected_choices(result.stdout) == {'parchment': 1, 'skill': 1, 'scheme': 1, 'default': 0}
+    # A local package with no checksum must fail rather than fall back to a release.
+    Path(str(local_package) + '.sha256').unlink()
+    result = subprocess.run(['bash', str(local_script), '--yes', '--dry-run'],
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0 and 'Checksum file not found' in result.stderr
+print('PASS checkout version selection, working-directory independence, and no silent release fallback')

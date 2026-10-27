@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.15 | 16 | 2026-10-27 | Current release | Added tab reordering and context-menu actions to close groups of tabs. |
+| 0.1.16 | 17 | 2026-10-27 | Current release | Install scripts in a checkout prefer its matching local build and never select an older release silently. |
+| 0.1.15 | 16 | 2026-10-27 | `84483f9` | Added tab reordering and context-menu actions to close groups of tabs. |
 | 0.1.14 | 15 | 2026-10-27 | `3ef38ef` | Added interactive setup questions to the command-line installer. |
 | 0.1.13 | 14 | 2026-10-27 | `f354621` | Added a command-line installer and documented macOS security prompts. |
 | 0.1.12 | 13 | 2026-10-27 | `1e977f1`, tag `v0.1.12` | Moved comment and review instructions from the README to the Help menu. |
@@ -20,6 +21,13 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.16
+
+- The install script reads the checkout version from scripts/Info.plist and prefers a matching package in dist/.
+- If that package is absent, it requests the exact checkout version from GitHub. It does not fall back to an older release.
+- A standalone script still selects the latest published release. Explicit --version and --package choices retain precedence.
+- Documented the difference between local builds and published releases in the README.
 
 ## 0.1.15
 

@@ -5,9 +5,10 @@ usage() {
     cat <<'USAGE'
 Usage: bash scripts/install.sh [options]
 
-Download the latest release, verify its checksum, and install Parchment in
-/Applications using macOS's command-line installer. Run without sudo; only
-the installation step requests administrator access.
+Install Parchment in /Applications using macOS's command-line installer.
+From a source checkout, use its version and prefer a matching local package.
+Otherwise, download the latest published release. Verify the checksum first.
+Run without sudo; only installation requests administrator access.
 
   --version VERSION     Install a specific release (for example, 0.1.12).
   --package PATH        Use a local .pkg and its adjacent .pkg.sha256 file.
@@ -107,6 +108,28 @@ download() {
         --retry 2 --connect-timeout 20 --max-time 300 "$1" --output "$2"
 }
 if [[ -z "$package" ]]; then
+    architecture="$(uname -m)"
+    # Prefer arm64 even when Terminal runs under Rosetta.
+    if [[ "$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null || true)" == 1 ]]; then architecture=arm64; fi
+    case "$architecture" in arm64|x86_64) ;; *) fail "Unsupported architecture: $architecture." ;; esac
+    script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -z "$version" && -f "$script_directory/Info.plist" && -f "$script_directory/../Package.swift" ]]; then
+        version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$script_directory/Info.plist")"
+        [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'The checkout has an invalid app version.'
+        local_package="$script_directory/../dist/Parchment-$version-$architecture.pkg"
+        if [[ -f "$local_package" ]]; then
+            package="$local_package"
+        elif [[ -f "$script_directory/../dist/Parchment-$version-universal.pkg" ]]; then
+            package="$script_directory/../dist/Parchment-$version-universal.pkg"
+        fi
+        if [[ -n "$package" ]]; then
+            printf 'Using the local installer for checkout version %s.\n' "$version" >&2
+        else
+            printf 'No local installer for checkout version %s; downloading that version.\n' "$version" >&2
+        fi
+    fi
+fi
+if [[ -z "$package" ]]; then
     if [[ -z "$version" ]]; then
         # Follow the public release redirect without GitHub API credentials or quotas.
         latest_url="$(/usr/bin/curl --fail --location --head --silent --show-error \
@@ -116,14 +139,10 @@ if [[ -z "$package" ]]; then
         [[ "$latest_url" =~ ^https://github\.com/prashantjois/parchment/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || fail 'The latest release has an unsupported version tag.'
         version="${BASH_REMATCH[1]}"
     fi
-    architecture="$(uname -m)"
-    # Prefer arm64 even when Terminal runs under Rosetta.
-    if [[ "$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null || true)" == 1 ]]; then architecture=arm64; fi
-    case "$architecture" in arm64|x86_64) ;; *) fail "Unsupported architecture: $architecture." ;; esac
     package_name="Parchment-$version-$architecture.pkg"
     release_url="https://github.com/prashantjois/parchment/releases/download/v$version"
     printf 'Downloading %s…\n' "$package_name" >&2
-    download "$release_url/$package_name" "$temporary_directory/$package_name" || fail "No installer could be downloaded for $version ($architecture)."
+    download "$release_url/$package_name" "$temporary_directory/$package_name" || fail "No published installer for $version ($architecture). Build this checkout with bash scripts/build-installer.sh or select a published version with --version."
     download "$release_url/$package_name.sha256" "$temporary_directory/$package_name.sha256"
     package="$temporary_directory/$package_name"
 else
