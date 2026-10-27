@@ -318,6 +318,55 @@ final class CoreTests {
             expectFalse(blocked.contains("<img"))
         }
     }
+    func testSyntaxHighlightingUsesTheFenceLanguageAndPreservesText() {
+        let examples = [
+            ("swift", "let value: String = greet(\"🌎\", 42) // note\n"),
+            ("kt", "val value: String = greet(\"🌎\", 42) // note\n"),
+            ("java", "final String value = greet(\"🌎\", 42); // note\n"),
+            ("js", "const value = greet(`🌎`, 42); // note\n"),
+            ("ts", "const value: string = greet(`🌎`, 42); // note\n"),
+            ("py", "def greet():\n    return \"🌎\", 42 # note\n"),
+            ("json", "{\"value\": true, \"count\": 42}"),
+            ("sh", "if true; then echo \"🌎\"; fi # note\n"),
+            ("sql", "SELECT '🌎', 42 FROM example -- note\n"),
+            ("yml", "value: true\ncount: 42 # note\n")
+        ]
+        for (language, code) in examples {
+            let tokens = SyntaxHighlighter.tokens(in: code, language: language)
+            expectEqual(tokens.map { (code as NSString).substring(with: $0.range) }.joined(), code)
+            expectTrue(tokens.contains { $0.kind == "keyword" })
+            expectTrue(tokens.contains { $0.kind == "number" } || language == "sh")
+            let html = MarkdownRenderer.render("```\(language)\n\(code)\n```").html
+            expectTrue(html.contains("class=\"token keyword\""))
+        }
+        expectFalse(SyntaxHighlighter.tokens(in: "let value = 42", language: "unknown").contains { $0.kind != nil })
+        expectFalse(SyntaxHighlighter.tokens(in: "let value", language: "json").contains { $0.kind != nil })
+        _ = SyntaxHighlighter.tokens(in: "if🌎", language: "swift")
+    }
+    func testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets() {
+        for newline in ["\n", "\r\n", "\r"] {
+            let code = ["let café = \"🌎\"", "let value: String = greet(42)", "// let 42 stays a comment"].joined(separator: newline)
+            let source = "```swift" + newline + code + newline + "```"
+            let html = MarkdownRenderer.render(source).html
+            for (kind, token) in [("string", "\"🌎\""), ("type", "String"), ("function", "greet"), ("number", "42")] {
+                let range = (source as NSString).range(of: token)
+                let attributes = "class=\"token \(kind)\" data-leaf=\"true\" data-start=\"\(range.location)\" data-end=\"\(NSMaxRange(range))\" data-precise=\"1\""
+                expectTrue(html.contains(attributes))
+            }
+            expectTrue(html.contains("class=\"token comment\""))
+        }
+    }
+    func testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole() {
+        let source = "```swift\nlet html = \"<script>// comment</script>\"\n/* let fake = 42 */\n```"
+        let html = MarkdownRenderer.render(source).html
+        expectFalse(html.contains("<script>"))
+        expectTrue(html.contains("&lt;script&gt;// comment&lt;/script&gt;"))
+        let code = "\"// inside string\" /* let fake = 42 */"
+        let colored = SyntaxHighlighter.tokens(in: code, language: "swift").filter { $0.kind != nil }
+        expectEqual(colored.map(\.kind), ["string", "comment"])
+        let python = "\"\"\"multi\nline # string\"\"\""
+        expectEqual(SyntaxHighlighter.tokens(in: python, language: "python").filter { $0.kind != nil }.map(\.kind), ["string"])
+    }
     func testCodeAndAttributeValuesAreEscaped() {
         let html = MarkdownRenderer.render("`<img src=x onerror=bad>`\n\n[link](https://example.com/?a=1&b=2)").html
         expectTrue(html.contains("&lt;img")); expectFalse(html.contains("<img src=x"))
@@ -369,6 +418,9 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testFrontMatterDetectionPreservesOrdinaryMarkdown", suite.testFrontMatterDetectionPreservesOrdinaryMarkdown),
             ("testRendererDoesNotExecuteRawHTMLOrUnsafeLinks", suite.testRendererDoesNotExecuteRawHTMLOrUnsafeLinks),
             ("testRemoteImagesStayBlockedUntilRequested", suite.testRemoteImagesStayBlockedUntilRequested),
+            ("testSyntaxHighlightingUsesTheFenceLanguageAndPreservesText", suite.testSyntaxHighlightingUsesTheFenceLanguageAndPreservesText),
+            ("testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets", suite.testHighlightedCodePreservesUnicodeAndCRLFSourceOffsets),
+            ("testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole", suite.testHighlightedCodeEscapesMarkupAndKeepsStringsAndCommentsWhole),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
         for (name, test) in tests {

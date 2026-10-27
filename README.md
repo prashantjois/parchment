@@ -46,6 +46,8 @@ Ten themes include light and dark palettes: Native, Parchment, Editorial, Termin
 
 The theme panel provides appearance, font, size, and text-color settings. It also supports CSS import, preview, and custom theme copies. Custom themes live in `~/Library/Application Support/Parchment/Themes/`.
 
+Fenced code blocks use local, language-aware syntax highlighting. Supported languages include Swift, Kotlin, Java, JavaScript, TypeScript, Python, JSON, Bash, SQL, and YAML. Themes control the colors for comments, keywords, strings, numbers, functions, and types. Unspecified and unsupported languages remain plain text.
+
 See [the CSS theme format](docs/theming.md) and [the sample themes](themes/).
 
 ## Comments
@@ -108,7 +110,6 @@ The core checks use a standalone Swift executable so they work with command-line
 
 - Markdown supports CommonMark and GFM tables, task lists, and strikethrough. Raw HTML appears as escaped text. Math, diagrams, and footnotes are not enabled.
 - Local raster images render. Remote images stay blocked by default. In Settings → General, toggle **Automatically load remote images**. Right-click a blocked image to **Load This Image** or **Automatically Load All Remote Images**. The latter enables the setting for every document. Image paste and asset management are not implemented.
-- Code blocks have theme styles but no language-aware token highlighting yet.
 - Scroll synchronization uses document proportions, not exact block alignment.
 - Parchment watches open files for external changes and asks whether to load the external version or keep your local text. Keeping local text pauses autosave until an explicit save. The local text and paused state survive restarts. Reloading preserves local comments and review drafts.
 - Published comments have flat replies and an immutable event history. Pending review drafts support editing and deletion.

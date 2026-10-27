@@ -35,7 +35,7 @@ import ParchmentCore
             if case .failure(let error) = result { failures += 1; print("FAIL \(theme.name) validation: \(error.localizedDescription)") }
             let source = "# Heading\n\nA **bold** thought.\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\n| A | B |\n| --- | --- |\n| C | D |\n\n```swift\nlet answer = 42\n```"
             let rendered = MarkdownRenderer.render(source + "\n\n![One](http://127.0.0.1:1/one.png)\n\n![Two](http://127.0.0.1:1/two.png)")
-            let css = Data((library.baseCSS + "\n" + theme.css).utf8).base64EncodedString()
+            let css = Data((library.baseCSS + "\n" + theme.css + "\n@layer parchment-user { .markdown-doc { --pt-syntax-keyword: #010203; } }").utf8).base64EncodedString()
             let html = """
             <html><head><meta charset="utf-8"></head><body>
             <article class="markdown-doc" data-appearance="\(appearance)">\(rendered.html)</article>
@@ -61,6 +61,18 @@ import ParchmentCore
           }
           if (typeof setComments !== 'function' || typeof jumpToSource !== 'function') errors.push('Preview bridge failed to load');
           else {
+            const code = document.querySelector('pre code'), keyword = code.querySelector('.token.keyword'), number = code.querySelector('.token.number');
+            if (!keyword || !number || code.textContent !== 'let answer = 42\n') errors.push('Code tokenization changed or missed source text');
+            else {
+              if (getComputedStyle(keyword).color !== 'rgb(1, 2, 3)') errors.push('Theme syntax color override was ignored');
+              setComments([{id:'code', start:+number.dataset.start, end:+number.dataset.end, active:true}]);
+              if ([...CSS.highlights.get('comments')][0]?.toString() !== '42') errors.push('Highlighted code comment anchor is incorrect');
+              const codeRange = document.createRange();
+              codeRange.setStart(keyword.firstChild, 0); codeRange.setEnd(number.firstChild, number.textContent.length);
+              getSelection().removeAllRanges(); getSelection().addRange(codeRange);
+              const mappedCode = selectedSource();
+              if (mappedCode?.start !== +keyword.dataset.start || mappedCode?.end !== +number.dataset.end) errors.push('Selection across syntax tokens lost source offsets');
+            }
             const images = [...document.querySelectorAll('[data-remote-src]')];
             if (images.length !== 2 || document.querySelector('img')) errors.push('Remote images loaded before permission');
             setRemoteImages({enabled:false, sources:[images[0].dataset.remoteSrc]});

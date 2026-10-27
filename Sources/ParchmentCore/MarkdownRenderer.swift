@@ -52,16 +52,50 @@ public enum MarkdownRenderer {
             guard let range = span(node) else { return "" }
             return " data-start=\"\(range.location)\" data-end=\"\(range.location + range.length)\""
         }
-        func leaf(_ node: Markup, text: String, tag: String = "span") -> String {
+        func leaf(_ node: Markup, text: String, tag: String = "span", html: String? = nil) -> String {
             var mapped = span(node)
             if let range = mapped, range.isValid(in: source) {
                 let slice = (source as NSString).substring(with: range.nsRange) as NSString
                 let found = slice.range(of: text, options: .literal)
                 if found.location != NSNotFound { mapped = TextSpan(location: range.location + found.location, length: found.length) }
             }
-            guard let range = mapped, range.isValid(in: source) else { return "<\(tag)>\(escape(text))</\(tag)>" }
+            guard let range = mapped, range.isValid(in: source) else { return "<\(tag)>\(html ?? escape(text))</\(tag)>" }
             let precise = (source as NSString).substring(with: range.nsRange) == text
-            return "<\(tag) data-leaf=\"true\" data-start=\"\(range.location)\" data-end=\"\(range.location + range.length)\" data-precise=\"\(precise ? 1 : 0)\">\(escape(text))</\(tag)>"
+            return "<\(tag) data-leaf=\"true\" data-start=\"\(range.location)\" data-end=\"\(range.location + range.length)\" data-precise=\"\(precise ? 1 : 0)\">\(html ?? escape(text))</\(tag)>"
+        }
+        func highlightedCode(_ code: CodeBlock) -> String {
+            let tokens = SyntaxHighlighter.tokens(in: code.code, language: code.language ?? "")
+            let text = code.code as NSString
+            func tokenHTML(_ token: SyntaxToken, mapping: String = "") -> String {
+                let classes = token.kind.map { " class=\"token \($0)\"" } ?? ""
+                return "<span\(classes)\(mapping)>\(escape(text.substring(with: token.range)))</span>"
+            }
+            guard tokens.contains(where: { $0.kind != nil }) else { return leaf(code, text: code.code) }
+            // Normalize CR/LF for matching while retaining every original UTF-16 boundary.
+            if let range = span(code), range.isValid(in: source) {
+                let raw = (source as NSString).substring(with: range.nsRange) as NSString
+                var units: [UInt16] = [], boundaries = [0], index = 0
+                while index < raw.length {
+                    let unit = raw.character(at: index)
+                    if unit == 13 {
+                        index += 1
+                        if index < raw.length && raw.character(at: index) == 10 { index += 1 }
+                        units.append(10)
+                    } else { units.append(unit); index += 1 }
+                    boundaries.append(index)
+                }
+                let normalized = String(decoding: units, as: UTF16.self) as NSString
+                let match = normalized.range(of: code.code, options: .literal)
+                if match.location != NSNotFound {
+                    return tokens.map { token in
+                        let start = boundaries[match.location + token.range.location], end = boundaries[match.location + NSMaxRange(token.range)]
+                        let precise = raw.substring(with: NSRange(location: start, length: end - start)) == text.substring(with: token.range)
+                        let mapping = " data-leaf=\"true\" data-start=\"\(range.location + start)\" data-end=\"\(range.location + end)\" data-precise=\"\(precise ? 1 : 0)\""
+                        return tokenHTML(token, mapping: mapping)
+                    }.joined()
+                }
+            }
+            return leaf(code, text: code.code, html: tokens.map { tokenHTML($0) }.joined())
         }
         func safeLink(_ value: String) -> String? {
             guard !value.contains(where: { $0.isNewline || $0.asciiValue.map { $0 < 32 } == true }) else { return nil }
@@ -97,7 +131,7 @@ public enum MarkdownRenderer {
             case let text as Markdown.Text: return leaf(node, text: text.string)
             case let code as InlineCode: return leaf(node, text: code.code, tag: "code")
             case let code as CodeBlock:
-                return "<pre\(a)><code data-language=\"\(escape(code.language ?? ""))\">\(leaf(node, text: code.code))</code></pre>"
+                return "<pre\(a)><code data-language=\"\(escape(code.language ?? ""))\">\(highlightedCode(code))</code></pre>"
             case is Paragraph: return "<p\(a)>\(children(node))</p>"
             case is Strong: return "<strong\(a)>\(children(node))</strong>"
             case is Emphasis: return "<em\(a)>\(children(node))</em>"

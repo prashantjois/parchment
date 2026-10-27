@@ -87,6 +87,21 @@ Custom themes can override these variables or style individual elements directly
 
 CSS pixels are logical display units. The renderer must account for display scale. User font-size changes affect relative heading and code sizes.
 
+## Code highlighting
+
+The fence language selects local lexical highlighting for Swift, Kotlin, Java, JavaScript, TypeScript, Python, JSON, Bash, SQL, and YAML. Common aliases include `kt`, `js`, `ts`, `py`, `sh`, and `yml`. Unspecified and unsupported languages remain plain text.
+
+The renderer uses the six `--pt-syntax-*` colors and `.token` selectors listed in this contract. Override the colors inside the theme layer. For example:
+
+```css
+@layer parchment-theme {
+  .markdown-doc { --pt-syntax-keyword: #7139a8; }
+  .markdown-doc[data-appearance="dark"] { --pt-syntax-keyword: #d5adff; }
+}
+```
+
+Highlighting uses lexical rules rather than a compiler or language server. It does not require network access. Code text stays escaped, and token spans retain source offsets for comments and selections.
+
 ## Markdown element contract
 
 | Markdown content | Stable selector |
