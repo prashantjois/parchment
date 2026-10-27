@@ -81,7 +81,13 @@ import ParchmentCore
                 Button("Add Comment") { workspace.beginComment() }.keyboardShortcut("m", modifiers: .control)
                 Button("Add File Comment") { workspace.beginFileComment() }.keyboardShortcut("m", modifiers: [.control, .shift]).disabled(workspace.active == nil)
             }
+            HelpCommands()
         }
+        Window("Editing Guide", id: "editing-help") {
+            HelpGuideView(name: "editing", themes: workspace.themes, openDocument: workspace.openIncomingURL)
+        }
+        .defaultSize(width: 760, height: 720)
+        .commandsRemoved()
         Settings { AppSettings(themes: workspace.themes) }
     }
     private func showFind(_ action: NSTextFinder.Action) {

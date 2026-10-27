@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.10 | 11 | 2026-10-27 | Current release | Made the installer the main README installation path. |
+| 0.1.11 | 12 | 2026-10-27 | Current release | Moved editing instructions from the README to the Help menu. |
+| 0.1.10 | 11 | 2026-10-27 | `2c6559e` | Made the installer the main README installation path. |
 | 0.1.9 | 10 | 2026-10-27 | `b66bfb6` | Removed the README Checks section. |
 | 0.1.8 | 9 | 2026-10-27 | `ef6cf8d` | File-level comments through tab icons, tab-name hover prompts, and Control-Shift-M. Added this version tracker. |
 | 0.1.7 | 8 | 2026-10-27 | `29f58ea` | Persistent unread reply tracking, unread-first ordering, blue highlights, an Unread filter, and read/unread actions. |
@@ -15,6 +16,12 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.11
+
+- Moved detailed editing instructions from the README into a bundled editing guide.
+- Added Help → Editing Guide, which opens a separate, read-only window.
+- The guide works offline and follows the selected theme.
 
 ## 0.1.10
 

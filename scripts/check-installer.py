@@ -59,7 +59,8 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
     resources = app / 'Contents/Resources'
     assert not list(resources.rglob('*.comments.json'))
     assert not list(resources.rglob('*.review.json'))
-    assert (resources / 'docs/versions.md').read_bytes() == (repository / 'docs/versions.md').read_bytes()
+    for document in (repository / 'docs').rglob('*.md'):
+        assert (resources / document.relative_to(repository)).read_bytes() == document.read_bytes()
     markdown_type = next(item for item in info['UTImportedTypeDeclarations'] if item['UTTypeIdentifier'] == 'net.daringfireball.markdown')
     assert markdown_type['UTTypeTagSpecification']['public.filename-extension'] == ['md', 'markdown']
     setup = app / 'Contents/MacOS/ParchmentSetup'
