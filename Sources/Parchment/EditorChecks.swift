@@ -80,6 +80,21 @@ import ParchmentCore
         expect(EditorShortcut.action(for: command) == nil, "Command-S remains the normal save shortcut")
         let controlM = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 46)!
         expect(EditorShortcut.action(for: controlM) == .comment, "Control-M control-character events route to comments")
+        for (characters, flags, key, expected) in [
+            ("[", NSEvent.ModifierFlags.command, UInt16(33), NavigationAction.back),
+            ("]", .command, UInt16(30), .forward),
+            ("", [.command, .option], UInt16(123), .back),
+            ("", [.command, .option], UInt16(124), .forward)
+        ] {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: key)!
+            expect(NavigationAction.action(for: event) == expected, "navigation keyboard shortcut routes to \(expected)")
+        }
+        for (button, expected) in [(3, NavigationAction.back), (4, .forward)] {
+            let event = NSEvent(cgEvent: CGEvent(mouseEventSource: nil, mouseType: .otherMouseDown, mouseCursorPosition: .zero, mouseButton: CGMouseButton(rawValue: UInt32(button))!)!)!
+            expect(NavigationAction.action(for: event) == expected, "mouse button \(button + 1) routes to \(expected)")
+        }
+        let wordMovement = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .option, timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 123)!
+        expect(NavigationAction.action(for: wordMovement) == nil, "Option-Left remains native word navigation")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("parchment-external-" + UUID().uuidString)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -112,6 +127,31 @@ import ParchmentCore
             expect(externalLinks == [browser] && workspace.active?.id == external.id, "external links use the system-browser action without changing tabs")
             navigation.openLink(URL(string: "file://remote-host/tmp/ignored.md")!)
             expect(workspace.active?.id == external.id && externalLinks.count == 1, "remote file URLs do not enter local navigation")
+            workspace.backHistory.removeAll(); workspace.forwardHistory.removeAll()
+            external.layout.mode = .split; external.layout.sourceScroll = 0.35; external.layout.renderedScroll = 0.4
+            external.selection = NSRange(location: 4, length: 2)
+            navigation.openLink(target.url!)
+            expect(workspace.backHistory.count == 1 && workspace.canGoBack && !workspace.canGoForward, "a file-and-heading link records one navigation step")
+            workspace.goBack()
+            expect(workspace.active?.id == external.id && external.selection == NSRange(location: 4, length: 2) && external.layout.sourceScroll == 0.35 && external.layout.renderedScroll == 0.4 && external.jump?.restoreScroll == true, "Back restores the previous file, selection, and both scroll positions")
+            workspace.goForward()
+            expect(workspace.active?.url == linked && workspace.active?.text == "Local target edits", "Forward returns to the live target without replacing unsaved text")
+            let destination = workspace.active!
+            destination.reveal(NSRange(location: 1, length: 0))
+            workspace.goBack()
+            expect(workspace.active?.id == destination.id && destination.selection.location != 1, "same-document jumps participate in history")
+            workspace.goBack()
+            let otherFolder = directory.appendingPathComponent("other", isDirectory: true)
+            try FileManager.default.createDirectory(at: otherFolder, withIntermediateDirectories: true)
+            workspace.openIncomingURL(otherFolder)
+            expect(!workspace.canGoForward, "a new destination after Back clears forward history")
+            workspace.open(linked)
+            destination.saveTask?.cancel(); destination.isDirty = false
+            workspace.open(path)
+            workspace.close(destination)
+            workspace.goBack()
+            expect(workspace.active?.url == linked, "Back reopens a closed saved file")
+            workspace.open(path)
             workspace.documents.first(where: { $0.url == linked })?.saveTask?.cancel()
             UserDefaults.standard.removeObject(forKey: "layout:\(linked.path)")
             let externalPane = SourcePane(document: external, beginComment: {})

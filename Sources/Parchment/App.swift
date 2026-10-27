@@ -67,12 +67,16 @@ import ParchmentCore
                 Button("Find…") { showFind(.showFindInterface) }.keyboardShortcut("f")
                 Button("Find and Replace…") { showFind(.showReplaceInterface) }.keyboardShortcut("f", modifiers: [.command, .option])
             }
+            CommandMenu("Navigate") {
+                Button("Back") { workspace.goBack() }.keyboardShortcut("[").disabled(!workspace.canGoBack)
+                Button("Forward") { workspace.goForward() }.keyboardShortcut("]").disabled(!workspace.canGoForward)
+            }
             CommandMenu("Format") {
                 Button("Bold") { NSApp.sendAction(#selector(MarkdownTextView.wrapBold), to: nil, from: nil) }.keyboardShortcut("b")
                 Button("Italic") { NSApp.sendAction(#selector(MarkdownTextView.wrapItalic), to: nil, from: nil) }.keyboardShortcut("i")
                 Button("Inline Code") { NSApp.sendAction(#selector(MarkdownTextView.wrapCode), to: nil, from: nil) }.keyboardShortcut("`", modifiers: [.command, .shift])
-                Button("Indent") { NSApp.sendAction(#selector(MarkdownTextView.indentSelection), to: nil, from: nil) }.keyboardShortcut("]")
-                Button("Outdent") { NSApp.sendAction(#selector(MarkdownTextView.outdentSelection), to: nil, from: nil) }.keyboardShortcut("[")
+                Button("Indent") { NSApp.sendAction(#selector(MarkdownTextView.indentSelection), to: nil, from: nil) }.keyboardShortcut("]", modifiers: [.command, .option])
+                Button("Outdent") { NSApp.sendAction(#selector(MarkdownTextView.outdentSelection), to: nil, from: nil) }.keyboardShortcut("[", modifiers: [.command, .option])
                 Divider()
                 Button("Add Comment") { workspace.beginComment() }.keyboardShortcut("m", modifiers: .control)
             }
@@ -162,6 +166,14 @@ struct WorkspaceView: View {
             }
         }
         .background(WindowShortcutBridge(workspace: workspace).frame(width: 0, height: 0))
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button(action: workspace.goBack) { Label("Back", systemImage: "chevron.left") }
+                    .disabled(!workspace.canGoBack).help("Back (⌘[)")
+                Button(action: workspace.goForward) { Label("Forward", systemImage: "chevron.right") }
+                    .disabled(!workspace.canGoForward).help("Forward (⌘])")
+            }
+        }
         .sheet(isPresented: $workspace.showThemes) { ThemeSettings(library: workspace.themes) }
         .sheet(isPresented: $workspace.composeComment) { if let doc = workspace.active { CommentComposer(document: doc) } }
         .alert("Parchment", isPresented: Binding(get: { workspace.error != nil }, set: { if !$0 { workspace.error = nil } })) {

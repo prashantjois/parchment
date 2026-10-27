@@ -43,10 +43,13 @@ struct WindowShortcutBridge: NSViewRepresentable {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow(); stopMonitoring()
         guard window != nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .otherMouseDown, .otherMouseUp, .swipe]) { [weak self] event in
             guard let self, let window = self.window, event.window === window,
                   window.attachedSheet == nil, window.sheetParent == nil, NSApp.modalWindow == nil,
-                  let action = EditorShortcut.action(for: event), let workspace = self.workspace else { return event }
+                  let workspace = self.workspace else { return event }
+            if let action = NavigationAction.action(for: event) { action.perform(in: workspace); return nil }
+            if event.type == .otherMouseUp && [3, 4].contains(event.buttonNumber) { return nil }
+            guard let action = EditorShortcut.action(for: event) else { return event }
             action.perform(in: workspace)
             return nil
         }

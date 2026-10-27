@@ -123,7 +123,10 @@ struct RenderedPane: NSViewRepresentable {
             if json != lastHighlights { lastHighlights = json; web.evaluateJavaScript("setComments(\(json))", completionHandler: nil) }
             if let jump = doc.jump, lastJump != jump.id {
                 lastJump = jump.id
-                web.evaluateJavaScript("jumpToSource(\(jump.range.location))", completionHandler: nil)
+                if jump.restoreScroll {
+                    lastScroll = doc.layout.renderedScroll
+                    web.evaluateJavaScript("setScroll(\(lastScroll))", completionHandler: nil)
+                } else { web.evaluateJavaScript("jumpToSource(\(jump.range.location))", completionHandler: nil) }
             } else if abs(lastScroll - doc.layout.renderedScroll) > 0.005 {
                 lastScroll = doc.layout.renderedScroll
                 web.evaluateJavaScript("setScroll(\(lastScroll))", completionHandler: nil)
@@ -160,6 +163,9 @@ struct RenderedPane: NSViewRepresentable {
                       let x = value["x"] as? Double, let y = value["y"] as? Double, let web {
                 web.selectionPopover.hide()
                 web.showRemoteImageMenu(source: source, at: NSPoint(x: x, y: web.isFlipped ? y : web.bounds.height - y))
+            } else if type == "fragment", let id = value["id"] as? String,
+                      let heading = doc.rendered.headings.first(where: { $0.id == id }) {
+                doc.reveal(NSRange(location: heading.location, length: 0))
             } else if type == "thread", let id = value["id"] as? String, let thread = doc.comments.threads.first(where: { $0.id.uuidString == id }) {
                 doc.selectThread(thread)
             }
@@ -169,8 +175,9 @@ struct RenderedPane: NSViewRepresentable {
             let sameFile = url.isFileURL && URL(fileURLWithPath: url.path).standardizedFileURL == parent.document.url?.standardizedFileURL
             if let fragment = url.fragment, !fragment.isEmpty, url.scheme == "about" || sameFile {
                 let decoded = fragment.removingPercentEncoding ?? fragment
-                let literal = String(data: try! JSONSerialization.data(withJSONObject: decoded, options: .fragmentsAllowed), encoding: .utf8)!
-                web?.evaluateJavaScript("document.getElementById(\(literal))?.scrollIntoView()", completionHandler: nil)
+                if let heading = parent.document.rendered.headings.first(where: { $0.id == decoded }) {
+                    parent.document.reveal(NSRange(location: heading.location, length: 0))
+                }
             } else if url.isFileURL && [nil, "", "localhost"].contains(url.host) || url.scheme?.lowercased() == "parchment" {
                 parent.openDocument?(url)
             } else if ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "") {
@@ -280,7 +287,7 @@ struct RenderedPane: NSViewRepresentable {
       const link = event.target.closest('a');
       if (link?.getAttribute('href')?.startsWith('#')) {
         event.preventDefault();
-        try { document.getElementById(decodeURIComponent(link.getAttribute('href').slice(1)))?.scrollIntoView(); } catch {}
+        try { send({type:'fragment', id:decodeURIComponent(link.getAttribute('href').slice(1))}); } catch {}
         return;
       }
       if (!getSelection().isCollapsed || link) return;

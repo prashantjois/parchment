@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 import ParchmentCore
 import ParchmentIntegration
 
-struct JumpRequest { var id = UUID(); var range: NSRange }
+struct JumpRequest { var id = UUID(); var range: NSRange; var restoreScroll = false }
 struct ExternalFileChange {
     var text: String?
     var message: String
@@ -30,7 +30,7 @@ enum DocumentSaveError: LocalizedError {
     @Published var loadedRemoteImages: Set<String> = []
     @Published var externalChange: ExternalFileChange?
     @Published var autosaveSuspended = false
-    @Published var browserRoot: URL
+    @Published var browserRoot: URL { willSet { if newValue != browserRoot { onNavigate?() } } }
     @Published var browserExpanded: Set<String> = []
     @Published var integrationAttachment: JSON = .object(["status": .string("unattached")])
     @Published var integrationError: String?
@@ -39,6 +39,7 @@ enum DocumentSaveError: LocalizedError {
     var saveTask: Task<Void, Never>?
     var renderTask: Task<Void, Never>?
     var onChange: (() -> Void)?
+    var onNavigate: (() -> Void)?
     var sourceTextView: MarkdownTextView?
     var sourceScrollView: NSScrollView?
     let undoManager = UndoManager()
@@ -147,8 +148,9 @@ enum DocumentSaveError: LocalizedError {
         if !sameFile { startWatching() }
         isDirty = false; saveMessage = "Saved"; onChange?()
     }
-    func reveal(_ range: NSRange) {
-        jump = JumpRequest(range: range)
+    func reveal(_ range: NSRange, restoreScroll: Bool = false) {
+        onNavigate?()
+        jump = JumpRequest(range: range, restoreScroll: restoreScroll)
         selection = range
     }
     func addComment(body: String, pending: Bool = false) {
@@ -208,7 +210,11 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
 
 @MainActor final class Workspace: ObservableObject {
     @Published var documents: [EditorDocument] = []
-    @Published var activeID: UUID?
+    @Published var activeID: UUID? { didSet { navigatedFromTab(oldValue) } }
+    @Published var backHistory: [NavigationLocation] = []
+    @Published var forwardHistory: [NavigationLocation] = []
+    var navigationDepth = 0
+    var recordsNavigation = false
     @Published var error: String?
     @Published var showThemes = false
     @Published var composeComment = false
@@ -227,10 +233,15 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         catch { self.error = "Cannot create the recovery folder: \(error.localizedDescription)" }
         restore()
         if documents.isEmpty { newDocument() }
+        recordsNavigation = true
     }
     func attach(_ document: EditorDocument) {
         do { try integration?.register(document) } catch { document.integrationError = error.localizedDescription }
         document.onChange = { [weak self] in self?.scheduleRecovery() }
+        document.onNavigate = { [weak self, weak document] in
+            guard let self, let document, self.activeID == document.id else { return }
+            self.recordCurrentLocation()
+        }
         document.startWatching()
         documents.append(document); activeID = document.id
     }
@@ -245,6 +256,9 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         if panel.runModal() == .OK { panel.urls.forEach(open) }
     }
     func open(_ url: URL) {
+        navigate { openWithoutHistory(url) }
+    }
+    private func openWithoutHistory(_ url: URL) {
         let url = url.standardizedFileURL.resolvingSymlinksInPath()
         if let document = documents.first(where: { $0.url == url }) { activeID = document.id; return }
         do {
@@ -259,6 +273,9 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         } catch { self.error = "Cannot open \(url.lastPathComponent): \(error.localizedDescription)" }
     }
     func openIncomingURL(_ url: URL) {
+        navigate { openIncomingURLWithoutHistory(url) }
+    }
+    private func openIncomingURLWithoutHistory(_ url: URL) {
         if url.isFileURL {
             guard [nil, "", "localhost"].contains(url.host) else { error = "Only local file links can open in Parchment."; return }
             let file = URL(fileURLWithPath: url.path).standardizedFileURL.resolvingSymlinksInPath()
@@ -327,6 +344,11 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         }
         persistLayout(document)
         document.stopWatching()
+        document.onNavigate = nil
+        if document.url == nil {
+            backHistory.removeAll { $0.documentID == document.id }
+            forwardHistory.removeAll { $0.documentID == document.id }
+        }
         let index = documents.firstIndex(where: { $0.id == document.id }) ?? 0
         documents.removeAll { $0.id == document.id }
         if activeID == document.id { activeID = documents.isEmpty ? nil : documents[min(index, documents.count - 1)].id }

@@ -148,7 +148,8 @@ struct SourcePane: NSViewRepresentable {
             c.lastJump = jump.id
             let length = (text.string as NSString).length
             let range = NSRange(location: min(jump.range.location, length), length: min(jump.range.length, max(0, length - jump.range.location)))
-            text.setSelectedRange(range); text.scrollRangeToVisible(range)
+            text.setSelectedRange(range)
+            if jump.restoreScroll { c.restoreScroll() } else { text.scrollRangeToVisible(range) }
         } else if document.layout.mode == .split && abs(c.lastScroll - document.layout.sourceScroll) > 0.005 {
             c.restoreScroll()
         }
