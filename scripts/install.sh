@@ -11,14 +11,20 @@ the installation step requests administrator access.
 
   --version VERSION     Install a specific release (for example, 0.1.12).
   --package PATH        Use a local .pkg and its adjacent .pkg.sha256 file.
+  --install-skill       Install the skill without asking about it.
   --skip-skill          Skip installing the Parchment agent skill.
+  --register            Register parchment:// links without asking about it.
   --skip-register       Skip immediate parchment:// link registration.
   --markdown-default    Make Parchment the default app for .md and .markdown.
+  --skip-markdown-default  Leave default file associations unchanged.
+  --yes                 Skip questions; use defaults for unspecified choices.
   --dry-run             Verify the package and show choices without installing.
   --help                Show this help.
 
-The defaults match the graphical installer: skill and link registration on,
-default Markdown app off. MCP client configuration remains a separate step.
+The script asks about each setup choice unless a flag supplies its answer.
+Press Enter to accept the defaults: skill and link registration on, default
+Markdown app off. Without interactive input, supply --yes or all three choices.
+MCP client configuration remains a separate step.
 This script does not sign or notarize the app. If macOS blocks its first launch,
 use System Settings > Privacy & Security > Open Anyway for Parchment.
 USAGE
@@ -27,9 +33,10 @@ USAGE
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 version=""
 package=""
-install_skill=1
-register_scheme=1
-markdown_default=0
+install_skill=""
+register_scheme=""
+markdown_default=""
+assume_defaults=0
 dry_run=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -37,9 +44,13 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || fail "Missing value for $1."
             if [[ "$1" == --version ]]; then version="${2#v}"; else package="$2"; fi
             shift 2 ;;
+        --install-skill) install_skill=1; shift ;;
         --skip-skill) install_skill=0; shift ;;
+        --register) register_scheme=1; shift ;;
         --skip-register) register_scheme=0; shift ;;
         --markdown-default) markdown_default=1; shift ;;
+        --skip-markdown-default) markdown_default=0; shift ;;
+        --yes) assume_defaults=1; shift ;;
         --dry-run) dry_run=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1. Use --help." ;;
@@ -55,6 +66,38 @@ os_version="$(/usr/bin/sw_vers -productVersion)"
 [[ "$EUID" -ne 0 ]] || fail 'Run this script without sudo; it requests administrator access for installation.'
 if [[ "$dry_run" -eq 0 ]] && /usr/bin/pgrep -x Parchment >/dev/null; then
     fail 'Quit Parchment before installing or upgrading it.'
+fi
+
+prompt_choice() {
+    local choice_variable="$1" question="$2" default_answer="$3" answer=""
+    while true; do
+        printf '%s ' "$question" >&2
+        IFS= read -r answer || fail 'Input ended; installation cancelled.'
+        case "$answer" in
+            '') printf -v "$choice_variable" '%s' "$default_answer"; return ;;
+            [Yy]|[Yy][Ee][Ss]) printf -v "$choice_variable" '%s' 1; return ;;
+            [Nn]|[Nn][Oo]) printf -v "$choice_variable" '%s' 0; return ;;
+            *) printf 'Enter y or n.\n' >&2 ;;
+        esac
+    done
+}
+if [[ "$assume_defaults" -eq 1 ]]; then
+    install_skill="${install_skill:-1}"
+    register_scheme="${register_scheme:-1}"
+    markdown_default="${markdown_default:-0}"
+else
+    if [[ -z "$install_skill" || -z "$register_scheme" || -z "$markdown_default" ]]; then
+        [[ -t 0 ]] || fail 'No interactive input. Run in Terminal, supply --yes, or set all three setup choices.'
+    fi
+    if [[ -z "$install_skill" ]]; then
+        prompt_choice install_skill 'Install the Parchment agent skill in ~/.agents/skills/parchment? [Y/n]' 1
+    fi
+    if [[ -z "$register_scheme" ]]; then
+        prompt_choice register_scheme 'Register parchment:// links now? [Y/n]' 1
+    fi
+    if [[ -z "$markdown_default" ]]; then
+        prompt_choice markdown_default 'Make Parchment the default app for .md and .markdown files? [y/N]' 0
+    fi
 fi
 
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/parchment-install.XXXXXX")"

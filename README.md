@@ -41,26 +41,38 @@ The script downloads the latest published release for your Mac and verifies its 
 
 The script requires no Swift toolchain, Python, or GitHub CLI. It avoids opening the package in Finder, but it does not sign or notarize Parchment. A first-launch security prompt can still require **Open Anyway**.
 
-The default choices match the graphical installer:
+The script asks three questions before the download and installation:
 
-| Setup action | Default | Script option |
+```text
+Install the Parchment agent skill in ~/.agents/skills/parchment? [Y/n]
+Register parchment:// links now? [Y/n]
+Make Parchment the default app for .md and .markdown files? [y/N]
+```
+
+Enter `y` or `n` for each question. Press Enter to accept the default. The defaults match the graphical installer: skill and link registration on, default Markdown app off.
+
+Flags answer individual questions. The script still asks about any choice without an explicit answer.
+
+| Setup action | Yes flag | No flag |
 | --- | --- | --- |
-| Install the agent skill in `~/.agents/skills/parchment` | On | `--skip-skill` skips it. |
-| Register `parchment://` links immediately | On | `--skip-register` skips it. |
-| Make Parchment the default for `.md` and `.markdown` files | Off | `--markdown-default` enables it. |
+| Install the agent skill | `--install-skill` | `--skip-skill` |
+| Register `parchment://` links immediately | `--register` | `--skip-register` |
+| Set the default app for `.md` and `.markdown` files | `--markdown-default` | `--skip-markdown-default` |
+
+Use `--yes` to skip setup questions and accept defaults for unspecified choices. Without interactive input, supply `--yes` or explicit answers for all three choices. If input ends during a prompt, the script cancels installation.
 
 The skill installer backs up a different existing copy. Skipping link registration preserves existing registrations. The default app choice leaves `.txt` files unchanged. MCP client configuration remains a separate step.
 
-For example, to make Parchment the default Markdown app without installing the skill, run:
+To skip setup questions, omit the skill, register links, and set Markdown file associations, run:
 
 ```sh
-bash scripts/install.sh --skip-skill --markdown-default
+bash scripts/install.sh --yes --skip-skill --markdown-default
 ```
 
 To install a local build, keep its `.pkg.sha256` file beside the package and run:
 
 ```sh
-bash scripts/install.sh --package dist/Parchment-0.1.13-arm64.pkg
+bash scripts/install.sh --package dist/Parchment-0.1.14-arm64.pkg
 ```
 
 Use `--version 0.1.12` to select a published version. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.

@@ -2,6 +2,7 @@
 """Exercise the install script against a real package without installing it."""
 import hashlib
 import itertools
+import os
 from pathlib import Path
 import plistlib
 import subprocess
@@ -12,8 +13,32 @@ script = Path(__file__).with_name('install.sh')
 package = Path(sys.argv[1]).resolve()
 
 
-def run(*arguments):
-    return subprocess.run(['bash', str(script), *arguments], capture_output=True, text=True)
+def run(*arguments, defaults=True):
+    options = ['--yes'] if defaults else []
+    return subprocess.run(['bash', str(script), *arguments, *options],
+                          stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+
+
+def selected_choices(output):
+    choices = plistlib.loads(output.encode())
+    return {item['choiceIdentifier']: item['attributeSetting']
+            for item in choices if item['choiceAttribute'] == 'selected'}
+
+
+def interactive(answers, *options):
+    terminal, input_fd = os.openpty()
+    try:
+        with subprocess.Popen(['bash', str(script), '--package', str(package), '--dry-run', *options],
+                              stdin=input_fd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
+            os.close(input_fd)
+            input_fd = None
+            os.write(terminal, answers.encode())
+            output, errors = process.communicate(timeout=30)
+            return process.returncode, output, errors
+    finally:
+        if input_fd is not None:
+            os.close(input_fd)
+        os.close(terminal)
 
 
 for skill, scheme, default in itertools.product([0, 1], repeat=3):
@@ -26,11 +51,29 @@ for skill, scheme, default in itertools.product([0, 1], repeat=3):
         options.append('--markdown-default')
     result = run('--package', str(package), '--dry-run', *options)
     assert result.returncode == 0, result.stderr
-    choices = plistlib.loads(result.stdout.encode())
-    selected = {item['choiceIdentifier']: item['attributeSetting']
-                for item in choices if item['choiceAttribute'] == 'selected'}
-    assert selected == {'parchment': 1, 'skill': skill, 'scheme': scheme, 'default': default}
+    assert selected_choices(result.stdout) == {'parchment': 1, 'skill': skill, 'scheme': scheme, 'default': default}
 print('PASS script defaults and all eight installer choices using the real package')
+
+for skill, scheme, default in itertools.product([0, 1], repeat=3):
+    answers = ''.join('yes\n' if enabled else 'no\n' for enabled in (skill, scheme, default))
+    code, output, errors = interactive(answers)
+    assert code == 0, errors
+    assert selected_choices(output) == {'parchment': 1, 'skill': skill, 'scheme': scheme, 'default': default}
+    assert all(question in errors for question in ['Install the Parchment agent skill',
+                                                  'Register parchment://', 'Make Parchment the default'])
+code, output, errors = interactive('\n\n\n')
+assert code == 0 and selected_choices(output) == {'parchment': 1, 'skill': 1, 'scheme': 1, 'default': 0}
+code, output, errors = interactive('maybe\nn\ny\n', '--skip-skill')
+assert code == 0 and selected_choices(output) == {'parchment': 1, 'skill': 0, 'scheme': 0, 'default': 1}
+assert 'Enter y or n.' in errors and 'Install the Parchment agent skill' not in errors
+code, output, errors = interactive('\x04')
+assert code != 0 and 'Input ended; installation cancelled' in errors
+result = run('--package', str(package), '--dry-run', defaults=False)
+assert result.returncode != 0 and 'No interactive input' in result.stderr
+result = run('--package', str(package), '--dry-run', '--install-skill', '--register',
+             '--skip-markdown-default', defaults=False)
+assert result.returncode == 0 and selected_choices(result.stdout) == {'parchment': 1, 'skill': 1, 'scheme': 1, 'default': 0}
+print('PASS terminal prompts, Enter defaults, flag overrides, invalid answers, EOF, and unattended use')
 
 with tempfile.TemporaryDirectory(prefix='parchment-install-script-check-') as temporary:
     local = Path(temporary) / 'package with spaces.pkg'

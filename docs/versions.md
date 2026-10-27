@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.13 | 14 | 2026-10-27 | Current release | Added a command-line installer and documented macOS security prompts. |
+| 0.1.14 | 15 | 2026-10-27 | Current release | Added interactive setup questions to the command-line installer. |
+| 0.1.13 | 14 | 2026-10-27 | `f354621` | Added a command-line installer and documented macOS security prompts. |
 | 0.1.12 | 13 | 2026-10-27 | `1e977f1`, tag `v0.1.12` | Moved comment and review instructions from the README to the Help menu. |
 | 0.1.11 | 12 | 2026-10-27 | `a5433c1` | Moved editing instructions from the README to the Help menu. |
 | 0.1.10 | 11 | 2026-10-27 | `2c6559e` | Made the installer the main README installation path. |
@@ -18,6 +19,14 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.14
+
+- The install script asks whether to install the skill, register parchment:// links, and change Markdown file associations.
+- Enter accepts the graphical installer defaults: Yes, Yes, and No.
+- Flags answer individual questions. The --yes flag accepts defaults for remaining choices without questions.
+- Missing terminal input requires explicit choices or --yes. End of input cancels an unanswered prompt.
+- Updated the README with prompts, defaults, and flags.
 
 ## 0.1.13
 
