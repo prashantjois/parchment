@@ -1,6 +1,6 @@
 # Parchment
 
-A local Markdown editor for macOS 14 or later. The interface uses SwiftUI and AppKit. WebKit renders Markdown with local CSS themes.
+Parchment is an AI-native Markdown editor for macOS 14 or later. Write, review, and revise local documents together with your agent.
 
 ## Build and open
 
