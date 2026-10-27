@@ -6,6 +6,7 @@ struct HelpCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .help) {
             Button("Editing Guide") { openWindow(id: "editing-help") }
+            Button("Comments Guide") { openWindow(id: "comments-help") }
         }
     }
 }

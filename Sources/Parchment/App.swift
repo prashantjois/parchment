@@ -88,6 +88,11 @@ import ParchmentCore
         }
         .defaultSize(width: 760, height: 720)
         .commandsRemoved()
+        Window("Comments Guide", id: "comments-help") {
+            HelpGuideView(name: "comments", themes: workspace.themes, openDocument: workspace.openIncomingURL)
+        }
+        .defaultSize(width: 760, height: 720)
+        .commandsRemoved()
         Settings { AppSettings(themes: workspace.themes) }
     }
     private func showFind(_ action: NSTextFinder.Action) {
