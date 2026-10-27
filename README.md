@@ -110,19 +110,6 @@ In cmux, Cmd-click a Parchment hyperlink to open it without changing cmux's file
 
 The build script registers the scheme with macOS. Links preserve unsaved edits and existing agent ownership. They open files but do not create them or attach conversations. MCP document responses include an `open_url` for saved files.
 
-## Checks
-
-```sh
-swift run --build-system native ParchmentChecks
-dist/Parchment.app/Contents/MacOS/Parchment --check-themes
-dist/Parchment.app/Contents/MacOS/Parchment --check-storage
-dist/Parchment.app/Contents/MacOS/Parchment --check-editor
-python3 scripts/check-integration.py --app dist/Parchment.app/Contents/MacOS/Parchment --mcp dist/Parchment.app/Contents/MacOS/ParchmentMCP
-python3 scripts/check-delivery.py --app dist/Parchment.app/Contents/MacOS/Parchment --mcp dist/Parchment.app/Contents/MacOS/ParchmentMCP
-```
-
-The core checks use a standalone Swift executable so they work with command-line developer tools without XCTest. They cover anchors, Unicode offsets, ambiguity, history, serialization, export, layout persistence, and HTML escaping. The headless WebKit checks cover all ten themes in both appearances, rendered selection mapping, and comment highlights. Storage checks use temporary files to verify tabs, companions, session restoration, and draft recovery. Editor checks cover native editing, undo/redo, clipboard operations, indentation, live previews, and shortcut routing.
-
 ## Current limits
 
 - Markdown supports CommonMark and GFM tables, task lists, and strikethrough. Raw HTML appears as escaped text. Math, diagrams, and footnotes are not enabled.

@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.8 | 9 | 2026-10-27 | Current release | File-level comments through tab icons, tab-name hover prompts, and Control-Shift-M. Added this version tracker. |
+| 0.1.9 | 10 | 2026-10-27 | Current release | Removed the README Checks section. |
+| 0.1.8 | 9 | 2026-10-27 | `ef6cf8d` | File-level comments through tab icons, tab-name hover prompts, and Control-Shift-M. Added this version tracker. |
 | 0.1.7 | 8 | 2026-10-27 | `29f58ea` | Persistent unread reply tracking, unread-first ordering, blue highlights, an Unread filter, and read/unread actions. |
 | 0.1.6 | 7 | 2026-10-27 | `0eb32bd` | Back/Forward buttons and history across files, tabs, headings, and folders. Keyboard, mouse, and swipe navigation restore cursor and scroll positions. |
 | 0.1.5 | 6 | 2026-10-27 | `3acd3b6`, tag `v0.1.5` | Automatic agent feedback delivery, syntax highlighting, link navigation, remote-image controls, external-change prompts, and documentation updates. |
@@ -13,6 +14,11 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.9
+
+- Removed the README Checks section as requested during review.
+- Build and verification scripts remain available in the repository.
 
 ## 0.1.8
 
