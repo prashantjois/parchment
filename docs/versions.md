@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.16 | 17 | 2026-10-27 | Current release | Install scripts in a checkout prefer its matching local build and never select an older release silently. |
+| 0.1.17 | 18 | 2026-10-27 | Current release | The install script requests a normal quit from running Parchment apps before installation. |
+| 0.1.16 | 17 | 2026-10-27 | `46d7d0c` | Install scripts in a checkout prefer its matching local build and never select an older release silently. |
 | 0.1.15 | 16 | 2026-10-27 | `84483f9` | Added tab reordering and context-menu actions to close groups of tabs. |
 | 0.1.14 | 15 | 2026-10-27 | `3ef38ef` | Added interactive setup questions to the command-line installer. |
 | 0.1.13 | 14 | 2026-10-27 | `f354621` | Added a command-line installer and documented macOS security prompts. |
@@ -21,6 +22,14 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.17
+
+- The install script requests a normal quit from running Parchment apps after package verification and before installation.
+- Normal quit preserves session recovery and follows existing save behavior.
+- Installation stops if an app refuses to quit or remains running after 30 seconds. The script does not force-quit it.
+- Dry runs leave running apps untouched. The script still requires no Swift toolchain.
+- Updated the README with the automatic quit behavior.
 
 ## 0.1.16
 

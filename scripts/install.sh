@@ -9,6 +9,8 @@ Install Parchment in /Applications using macOS's command-line installer.
 From a source checkout, use its version and prefer a matching local package.
 Otherwise, download the latest published release. Verify the checksum first.
 Run without sudo; only installation requests administrator access.
+Before installation, request a normal quit from any running Parchment app.
+Stop if it refuses or does not quit within 30 seconds. A dry run leaves it open.
 
   --version VERSION     Install a specific release (for example, 0.1.12).
   --package PATH        Use a local .pkg and its adjacent .pkg.sha256 file.
@@ -65,10 +67,6 @@ fi
 os_version="$(/usr/bin/sw_vers -productVersion)"
 [[ "${os_version%%.*}" -ge 14 ]] || fail 'Parchment requires macOS 14 or later.'
 [[ "$EUID" -ne 0 ]] || fail 'Run this script without sudo; it requests administrator access for installation.'
-if [[ "$dry_run" -eq 0 ]] && /usr/bin/pgrep -x Parchment >/dev/null; then
-    fail 'Quit Parchment before installing or upgrading it.'
-fi
-
 prompt_choice() {
     local choice_variable="$1" question="$2" default_answer="$3" answer=""
     while true; do
@@ -177,6 +175,34 @@ if [[ "$dry_run" -eq 1 ]]; then
     /usr/sbin/installer -pkg "$package" -target / -showChoicesAfterApplyingChangesXML "$choices"
     printf 'Dry run complete. No app, skill, or user settings changed.\n' >&2
     exit 0
+fi
+
+if ! /usr/bin/osascript -l JavaScript - local.parchment.editor <<'JXA'
+ObjC.import('AppKit');
+function run(argv) {
+    const identifier = argv[0];
+    const timeoutSeconds = argv.length > 1 ? Number(argv[1]) : 30;
+    const running = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier);
+    const apps = [];
+    for (let i = 0; i < running.count; i++) apps.push(running.objectAtIndex(i));
+    if (apps.length === 0) return;
+    console.log('Requesting a normal quit from Parchment…');
+    for (const app of apps) {
+        if (!app.isTerminated && !app.terminate) throw new Error('Parchment refused the quit request.');
+    }
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    while (apps.some(app => !app.isTerminated) && Date.now() < deadline) {
+        $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1));
+    }
+    if (apps.some(app => !app.isTerminated) ||
+        $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier).count > 0) {
+        throw new Error('Parchment is still running; installation stopped.');
+    }
+    console.log('Parchment quit normally.');
+}
+JXA
+then
+    fail 'Parchment did not quit normally. Resolve any save dialogs, then run this script again.'
 fi
 
 printf 'Installing in /Applications. macOS will request administrator access.\n' >&2

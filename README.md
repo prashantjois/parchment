@@ -43,6 +43,8 @@ A standalone copy of the script downloads the latest published GitHub Release. A
 
 The script verifies the package checksum before installation. It runs macOS's command-line installer with the same setup actions as the graphical installer. Only the installation step requests administrator access. Run the script without `sudo`.
 
+After verification, the script requests a normal quit from any running Parchment app before installation. Parchment saves its session recovery data as usual. The script waits up to 30 seconds. If the app refuses or remains open, installation stops without a forced quit. Resolve any save dialogs, then run the script again. A dry run leaves the app running.
+
 The script requires no Swift toolchain, Python, or GitHub CLI. It avoids opening the package in Finder, but it does not sign or notarize Parchment. A first-launch security prompt can still require **Open Anyway**.
 
 The script asks three questions before the download and installation:
@@ -76,7 +78,7 @@ bash scripts/install.sh --yes --skip-skill --markdown-default
 To install a local build, keep its `.pkg.sha256` file beside the package and run:
 
 ```sh
-bash scripts/install.sh --package dist/Parchment-0.1.16-arm64.pkg
+bash scripts/install.sh --package dist/Parchment-0.1.17-arm64.pkg
 ```
 
 Use `--version 0.1.12` to select a published version. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
