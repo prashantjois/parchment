@@ -140,7 +140,7 @@ def main():
         try:
             a, b = new_client(), new_client()
             tools = a.request("tools/list")["tools"]
-            assert len(tools) == 15 and len({tool["name"] for tool in tools}) == 15
+            assert len(tools) == 18 and len({tool["name"] for tool in tools}) == 18
             a.tool("list_documents", error="APP_UNAVAILABLE")
             a.tool("create_session", {"client": 42, "conversation_label": "bad"}, error="INVALID_ARGUMENT")
             passed("MCP initialization, schemas, and unavailable-app error")

@@ -134,6 +134,15 @@ struct CommentsSidebar: View {
                     Text(document.integrationAttachment["conversation_label"].string ?? "Agent conversation").font(.callout).lineLimit(2)
                     Text("\(document.integrationAttachment["client"].string ?? "Agent") · \(document.integrationAttachment["queued_feedback"].int ?? 0) feedback items awaiting acknowledgement")
                         .font(.caption).foregroundStyle(.secondary)
+                    if document.integrationAttachment["delivery"]["last_error"].string != nil {
+                        Text("Could not notify the agent. Parchment will retry.").font(.caption).foregroundStyle(.orange)
+                            .help(document.integrationAttachment["delivery"]["last_error"].string ?? "")
+                    } else {
+                        Text(document.integrationAttachment["delivery"]["registered"].bool == true
+                             ? "Automatic feedback delivery enabled"
+                             : "Automatic feedback delivery is not configured")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Button("Disconnect Agent…") { disconnectAgent = true }.buttonStyle(.borderless).font(.caption)
                 }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(.tint.opacity(0.07), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 10).padding(.bottom, 10)

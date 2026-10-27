@@ -28,6 +28,10 @@ public final class IntegrationRegistry: @unchecked Sendable {
             try execute("CREATE TABLE IF NOT EXISTS feedback (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL, document_id TEXT NOT NULL REFERENCES documents(id), payload TEXT NOT NULL, created REAL NOT NULL, UNIQUE(document_id,event_id))")
             try execute("CREATE INDEX IF NOT EXISTS feedback_document_sequence ON feedback(document_id, sequence)")
             try execute("CREATE TABLE IF NOT EXISTS operations (operation_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, binding_id TEXT NOT NULL, generation INTEGER NOT NULL, request_hash TEXT NOT NULL, before_revision TEXT, after_revision TEXT, result TEXT NOT NULL, state TEXT NOT NULL)")
+            // Delivery is additive. Existing document/session tables remain compatible.
+            try execute("CREATE TABLE IF NOT EXISTS receivers (session_id TEXT PRIMARY KEY REFERENCES sessions(id), receiver_id TEXT NOT NULL UNIQUE, agent_session_id TEXT NOT NULL, executable TEXT NOT NULL, arguments TEXT NOT NULL)")
+            try execute("CREATE TABLE IF NOT EXISTS notifications (delivery_id TEXT PRIMARY KEY, receiver_id TEXT NOT NULL REFERENCES receivers(receiver_id) ON DELETE CASCADE, document_id TEXT NOT NULL REFERENCES documents(id), binding_id TEXT NOT NULL, generation INTEGER NOT NULL, sequence INTEGER NOT NULL REFERENCES feedback(sequence), attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, lease_id TEXT, lease_until REAL NOT NULL DEFAULT 0, accepted_at REAL, last_error TEXT, UNIQUE(receiver_id,binding_id,sequence))")
+            try execute("CREATE INDEX IF NOT EXISTS notification_due ON notifications(accepted_at,next_attempt,lease_until)")
             try execute("PRAGMA user_version=1")
         }
     }
@@ -47,13 +51,13 @@ public final class IntegrationRegistry: @unchecked Sendable {
         return statement
     }
     private func databaseError() -> BridgeError { BridgeError("REGISTRY_ERROR", db.map { String(cString: sqlite3_errmsg($0)) } ?? "Registry is closed.") }
-    private func execute(_ sql: String, _ values: [JSON] = []) throws {
+    func execute(_ sql: String, _ values: [JSON] = []) throws {
         lock.lock(); defer { lock.unlock() }
         let statement = try prepare(sql, values); defer { sqlite3_finalize(statement) }
         let result = sqlite3_step(statement)
         guard result == SQLITE_DONE || result == SQLITE_ROW else { throw databaseError() }
     }
-    private func rows(_ sql: String, _ values: [JSON] = []) throws -> [[String: JSON]] {
+    func rows(_ sql: String, _ values: [JSON] = []) throws -> [[String: JSON]] {
         lock.lock(); defer { lock.unlock() }
         let statement = try prepare(sql, values); defer { sqlite3_finalize(statement) }
         var result: [[String: JSON]] = []
@@ -74,7 +78,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
         }
         return result
     }
-    private func transaction<T>(_ action: () throws -> T) throws -> T {
+    func transaction<T>(_ action: () throws -> T) throws -> T {
         lock.lock(); defer { lock.unlock() }
         try execute("BEGIN IMMEDIATE")
         do { let value = try action(); try execute("COMMIT"); return value }
@@ -123,7 +127,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
     public func attachment(_ documentID: String) throws -> JSON {
         guard let row = try rows("SELECT b.session_id,b.generation,b.acknowledged,s.client,s.label,s.last_seen FROM bindings b LEFT JOIN sessions s ON s.id=b.session_id WHERE b.document_id=?", [.string(documentID)]).first, row["session_id"] != .null else { return .object(["status": .string("unattached")]) }
         let queued = try rows("SELECT COUNT(*) AS count FROM feedback WHERE document_id=? AND sequence>?", [.string(documentID), row["acknowledged"] ?? .integer(0)]).first?["count"] ?? .integer(0)
-        return .object(["status": .string("attached"), "session_id": row["session_id"]!, "generation": row["generation"]!, "client": row["client"] ?? .null, "conversation_label": row["label"] ?? .null, "last_seen": row["last_seen"] ?? .null, "queued_feedback": queued])
+        return .object(["status": .string("attached"), "session_id": row["session_id"]!, "generation": row["generation"]!, "client": row["client"] ?? .null, "conversation_label": row["label"] ?? .null, "last_seen": row["last_seen"] ?? .null, "queued_feedback": queued, "delivery": try receiverStatus(sessionID: row["session_id"]!)])
     }
     public func attach(documentID: String, sessionToken: String) throws -> JSON {
         try transaction {

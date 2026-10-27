@@ -79,7 +79,7 @@ One conversation owns each document. Pending reviews stay private until submissi
 
 Configure your MCP client with `dist/Parchment.app/Contents/MacOS/ParchmentMCP` as an absolute executable path. See [MCP setup and workflow](docs/mcp.md).
 
-The client-neutral wait tool works within an active conversation. Automatic resumption of a finished conversation requires a client-specific adapter.
+Published feedback can notify the owning agent after its turn ends. Register the existing agent session and its runtime queue command through `register_receiver`. Parchment delivers notifications with durable retries; the agent reads and acknowledges feedback through MCP. The protocol works across models and frameworks with a supported runtime queue interface. Without a receiver, the wait tool works within an active conversation. See [automatic agent delivery](docs/mcp.md#automatic-agent-delivery).
 
 The loadable [Parchment agent skill](skills/parchment/SKILL.md) makes Parchment the default for Markdown document work. It covers document attachment, live edits, published feedback, review sessions, and conflict recovery. Load the file directly, or install the `skills/parchment` folder in your agent's skill directory. The skill requires the Parchment MCP connection described above.
 
@@ -99,6 +99,7 @@ dist/Parchment.app/Contents/MacOS/Parchment --check-themes
 dist/Parchment.app/Contents/MacOS/Parchment --check-storage
 dist/Parchment.app/Contents/MacOS/Parchment --check-editor
 python3 scripts/check-integration.py --app dist/Parchment.app/Contents/MacOS/Parchment --mcp dist/Parchment.app/Contents/MacOS/ParchmentMCP
+python3 scripts/check-delivery.py --app dist/Parchment.app/Contents/MacOS/Parchment --mcp dist/Parchment.app/Contents/MacOS/ParchmentMCP
 ```
 
 The core checks use a standalone Swift executable so they work with command-line developer tools without XCTest. They cover anchors, Unicode offsets, ambiguity, history, serialization, export, layout persistence, and HTML escaping. The headless WebKit checks cover all ten themes in both appearances, rendered selection mapping, and comment highlights. Storage checks use temporary files to verify tabs, companions, session restoration, and draft recovery. Editor checks cover native editing, undo/redo, clipboard operations, indentation, live previews, and shortcut routing.

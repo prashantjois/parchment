@@ -17,6 +17,7 @@ import ParchmentIntegration
     private weak var workspace: Workspace?
     private let headless: Bool
     private var timer: Task<Void, Never>?
+    private var dispatcherTask: Task<Void, Never>?
     private var publishedHashes: [UUID: String] = [:]
     init(workspace: Workspace, directory: URL, headless: Bool = false, server: LocalAPIServer? = nil) throws {
         self.workspace = workspace; self.headless = headless
@@ -39,8 +40,10 @@ import ParchmentIntegration
             }
         }
         syncFeedback()
+        let dispatcher = FeedbackDispatcher(registry: registry)
+        dispatcherTask = Task.detached { await dispatcher.run() }
     }
-    func stop() { timer?.cancel(); server.stop() }
+    func stop() { timer?.cancel(); dispatcherTask?.cancel(); server.stop() }
     func canonicalID(for url: URL, comments: CommentFile) throws -> UUID {
         let id = try registry.registerDocument(path: url.path, preferredID: comments.documentID ?? UUID(), title: url.lastPathComponent)
         return UUID(uuidString: id)!
@@ -195,7 +198,7 @@ import ParchmentIntegration
         guard let workspace else { throw BridgeError("APP_UNAVAILABLE", "The editor is closing.") }
         defer { refreshAttachments() }
         switch method {
-        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "pid": .integer(Int(getpid()))])
+        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "agent_delivery_version": .integer(1), "pid": .integer(Int(getpid()))])
         case "activate":
             if !headless { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first(where: { $0.title == "Parchment" })?.makeKeyAndOrderFront(nil) }
             return .object(["running": .bool(true)])
