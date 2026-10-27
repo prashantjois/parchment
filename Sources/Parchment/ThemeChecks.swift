@@ -34,7 +34,7 @@ import ParchmentCore
         ThemeCSSValidator.validate(theme.css) { [self] result in
             if case .failure(let error) = result { failures += 1; print("FAIL \(theme.name) validation: \(error.localizedDescription)") }
             let source = "# Heading\n\nA **bold** thought.\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\n| A | B |\n| --- | --- |\n| C | D |\n\n```swift\nlet answer = 42\n```"
-            let rendered = MarkdownRenderer.render(source)
+            let rendered = MarkdownRenderer.render(source + "\n\n![One](http://127.0.0.1:1/one.png)\n\n![Two](http://127.0.0.1:1/two.png)")
             let css = Data((library.baseCSS + "\n" + theme.css).utf8).base64EncodedString()
             let html = """
             <html><head><meta charset="utf-8"></head><body>
@@ -61,6 +61,16 @@ import ParchmentCore
           }
           if (typeof setComments !== 'function' || typeof jumpToSource !== 'function') errors.push('Preview bridge failed to load');
           else {
+            const images = [...document.querySelectorAll('[data-remote-src]')];
+            if (images.length !== 2 || document.querySelector('img')) errors.push('Remote images loaded before permission');
+            setRemoteImages({enabled:false, sources:[images[0].dataset.remoteSrc]});
+            if (!images[0].querySelector('img') || images[1].querySelector('img')) errors.push('Individual image permission was not isolated');
+            if (images[0].querySelector('img')?.referrerPolicy !== 'no-referrer') errors.push('Remote image leaked referrer');
+            images[1].dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:20, clientY:30}));
+            setRemoteImages({enabled:true, sources:[]});
+            if (document.querySelectorAll('[data-remote-src] img').length !== 2) errors.push('Automatic image loading missed images');
+            setRemoteImages({enabled:false, sources:[]});
+            if (document.querySelector('[data-remote-src] img')) errors.push('Disabling automatic image loading kept images');
             const leaf = [...document.querySelectorAll('[data-leaf]')].find(e=>e.textContent==='bold');
             setComments([{id:'test',start:+leaf.dataset.start,end:+leaf.dataset.end,active:true}]);
             if (!CSS.highlights.get('comments')?.size) errors.push('Comment highlights missing');
@@ -79,6 +89,9 @@ import ParchmentCore
                 print("PASS \(builtins[index].name) \(appearance): \(result["fontSize"] ?? "") / \(result["background"] ?? "")")
             } else { failures += 1; print("FAIL \(builtins[index].name) \(appearance): \(value ?? "No result")") }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [self] in
+                if !messages.contains(where: { $0["type"] as? String == "remote-image-menu" && $0["source"] as? String == "http://127.0.0.1:1/two.png" }) {
+                    failures += 1; print("FAIL blocked image did not offer its context menu")
+                }
                 if !messages.contains(where: { $0["type"] as? String == "selection" && $0["start"] as? Int == 15 && $0["end"] as? Int == 19 }) {
                     failures += 1; print("FAIL rendered selection did not map to the bold source range: \(messages)")
                 }

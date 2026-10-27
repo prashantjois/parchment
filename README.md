@@ -106,7 +106,7 @@ The core checks use a standalone Swift executable so they work with command-line
 ## Current limits
 
 - Markdown supports CommonMark and GFM tables, task lists, and strikethrough. Raw HTML appears as escaped text. Math, diagrams, and footnotes are not enabled.
-- Local raster images render. Remote images do not load automatically. Image paste and asset management are not implemented.
+- Local raster images render. Remote images stay blocked by default. In Settings → General, toggle **Automatically load remote images**. Right-click a blocked image to **Load This Image** or **Automatically Load All Remote Images**. The latter enables the setting for every document. Image paste and asset management are not implemented.
 - Code blocks have theme styles but no language-aware token highlighting yet.
 - Scroll synchronization uses document proportions, not exact block alignment.
 - The app does not watch files for external changes. Close a file before another tool edits it, then reopen it.

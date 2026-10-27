@@ -6,7 +6,20 @@ import ParchmentCore
 final class PreviewWebView: WKWebView, NSMenuItemValidation {
     var commentAction: (() -> Void)?
     var hasCommentSelection = false
+    var remoteImageAction: ((String, Bool) -> Void)?
+    private var remoteImageSource = ""
     let selectionPopover = SelectionCommentPopover()
+    func showRemoteImageMenu(source: String, at point: NSPoint) {
+        remoteImageSource = source
+        let menu = NSMenu()
+        for (title, action) in [("Load This Image", #selector(loadRemoteImage)), ("Automatically Load All Remote Images", #selector(loadAllRemoteImages))] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self; menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: point, in: self)
+    }
+    @objc func loadRemoteImage() { remoteImageAction?(remoteImageSource, false) }
+    @objc func loadAllRemoteImages() { remoteImageAction?(remoteImageSource, true) }
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
         selectionPopover.hide()
@@ -27,6 +40,7 @@ struct RenderedPane: NSViewRepresentable {
     var previewCSS: String? = nil
     var allowsComments = true
     var beginComment: () -> Void
+    @AppStorage("loadRemoteImages") private var loadRemoteImages = false
     @Environment(\.colorScheme) private var colorScheme
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> PreviewWebView {
@@ -34,6 +48,12 @@ struct RenderedPane: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "parchment")
         let web = PreviewWebView(frame: .zero, configuration: config)
         web.navigationDelegate = context.coordinator
+        web.remoteImageAction = { [weak coordinator = context.coordinator] source, all in
+            guard let coordinator else { return }
+            if all { coordinator.parent.loadRemoteImages = true }
+            else { coordinator.parent.document.loadedRemoteImages.insert(source) }
+            coordinator.updateState()
+        }
         if allowsComments { web.commentAction = { [weak coordinator = context.coordinator] in coordinator?.requestComment() } }
         web.setValue(false, forKey: "drawsBackground")
         context.coordinator.web = web
@@ -57,7 +77,8 @@ struct RenderedPane: NSViewRepresentable {
             let html = """
             <!doctype html><html><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'nonce-\(nonce)';">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; script-src 'nonce-\(nonce)';">
+            <meta name="referrer" content="no-referrer">
             <style>html,body{margin:0;min-height:100%;}.markdown-doc{min-height:100vh;}::highlight(comments){background:#e5b54b55;}::highlight(active-comment){background:#e5b54b99;}</style>
             </head><body><article class="markdown-doc" data-appearance="\(dark ? "dark" : "light")">\(document.rendered.html)</article>
             <script nonce="\(nonce)">
@@ -79,13 +100,19 @@ struct RenderedPane: NSViewRepresentable {
         var lastJump: UUID?
         var lastScroll = -1.0
         var lastHighlights = ""
+        var lastImagePolicy = ""
         init(_ parent: RenderedPane) { self.parent = parent }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            ready = true; lastScroll = -1; lastHighlights = ""; updateState()
+            ready = true; lastScroll = -1; lastHighlights = ""; lastImagePolicy = ""; updateState()
         }
         func updateState() {
             guard let web else { return }
             let doc = parent.document
+            let policy = String(data: try! JSONSerialization.data(withJSONObject: ["enabled": parent.loadRemoteImages, "sources": doc.loadedRemoteImages.sorted()]), encoding: .utf8)!
+            if policy != lastImagePolicy {
+                lastImagePolicy = policy
+                web.evaluateJavaScript("setRemoteImages(\(policy))", completionHandler: nil)
+            }
             let ranges = doc.comments.threads.filter { !$0.isResolved }.compactMap { thread -> [String: Any]? in
                 guard let range = thread.anchor.locate(in: doc.text).range else { return nil }
                 return ["id": thread.id.uuidString, "start": range.location, "end": range.location + range.length, "active": thread.id == doc.selectedThread]
@@ -127,6 +154,10 @@ struct RenderedPane: NSViewRepresentable {
                 lastScroll = fraction; doc.layout.renderedScroll = fraction
                 if doc.layout.mode == .split { doc.layout.sourceScroll = fraction }
                 doc.onChange?()
+            } else if type == "remote-image-menu", let source = value["source"] as? String,
+                      let x = value["x"] as? Double, let y = value["y"] as? Double, let web {
+                web.selectionPopover.hide()
+                web.showRemoteImageMenu(source: source, at: NSPoint(x: x, y: web.isFlipped ? y : web.bounds.height - y))
             } else if type == "thread", let id = value["id"] as? String, let thread = doc.comments.threads.first(where: { $0.id.uuidString == id }) {
                 doc.selectThread(thread)
             }
@@ -143,6 +174,30 @@ struct RenderedPane: NSViewRepresentable {
     }
     static let script = #"""
     const send = value => window.webkit.messageHandlers.parchment.postMessage(value);
+    function setRemoteImages(policy) {
+      const allowed = new Set(policy.sources);
+      for (const element of document.querySelectorAll('[data-remote-src]')) {
+        if (policy.enabled || allowed.has(element.dataset.remoteSrc)) {
+          if (element.querySelector('img')) continue;
+          const image = document.createElement('img');
+          image.alt = element.dataset.alt;
+          image.referrerPolicy = 'no-referrer';
+          image.onerror = () => {
+            if (element.contains(image)) element.textContent = '[Remote image unavailable: ' + element.dataset.alt + ']';
+          };
+          image.src = element.dataset.remoteSrc;
+          element.replaceChildren(image);
+        } else {
+          element.textContent = '[Remote image: ' + element.dataset.alt + ']';
+        }
+      }
+    }
+    document.addEventListener('contextmenu', event => {
+      const element = event.target.closest('[data-remote-src]');
+      if (!element || element.querySelector('img')) return;
+      event.preventDefault();
+      send({type:'remote-image-menu', source:element.dataset.remoteSrc, x:event.clientX, y:event.clientY});
+    });
     let ignoreScroll = false, commentRanges = [];
     const leaves = () => [...document.querySelectorAll('[data-leaf]')];
     function endpoint(node, offset, end) {

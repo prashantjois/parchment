@@ -77,11 +77,26 @@ import ParchmentCore
                 Button("Add Comment") { workspace.beginComment() }.keyboardShortcut("m", modifiers: .control)
             }
         }
-        Settings { ThemeSettings(library: workspace.themes) }
+        Settings { AppSettings(themes: workspace.themes) }
     }
     private func showFind(_ action: NSTextFinder.Action) {
         let sender = NSMenuItem(); sender.tag = action.rawValue
         NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: sender)
+    }
+}
+
+struct AppSettings: View {
+    @ObservedObject var themes: ThemeLibrary
+    @AppStorage("loadRemoteImages") private var loadRemoteImages = false
+    var body: some View {
+        TabView {
+            Form {
+                Toggle("Automatically load remote images", isOn: $loadRemoteImages)
+                Text("When disabled, right-click a remote image placeholder to load that image or enable automatic loading.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(24).tabItem { Label("General", systemImage: "gearshape") }
+            ThemeSettings(library: themes).tabItem { Label("Themes", systemImage: "paintpalette") }
+        }.frame(width: 960, height: 800)
     }
 }
 

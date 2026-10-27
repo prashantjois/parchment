@@ -112,6 +112,12 @@ public enum MarkdownRenderer {
                 guard let href = safeLink(link.destination ?? "") else { return children(node) }
                 return "<a href=\"\(escape(href))\"\(a)>\(children(node))</a>"
             case let image as Markdown.Image:
+                if let remote = URL(string: image.source ?? ""),
+                   ["https", "http"].contains(remote.scheme?.lowercased() ?? ""),
+                   remote.host?.isEmpty == false, remote.user == nil, remote.password == nil {
+                    let alt = escape(image.plainText)
+                    return "<span class=\"remote-image\" data-remote-src=\"\(escape(remote.absoluteString))\" data-alt=\"\(alt)\"\(a)>[Remote image: \(alt)]</span>"
+                }
                 guard let src = imageSource(image.source ?? "") else { return "<span\(a)>[Image: \(escape(image.plainText))]</span>" }
                 return "<img src=\"\(src)\" alt=\"\(escape(image.plainText))\"\(a)>"
             case is LineBreak: return "<br\(a)>"

@@ -304,7 +304,19 @@ final class CoreTests {
     func testRendererDoesNotExecuteRawHTMLOrUnsafeLinks() {
         let html = MarkdownRenderer.render("<script>alert(1)</script>\n\n[x](javascript:alert)\n\n![remote](https://example.com/tracker.png)").html
         expectFalse(html.contains("<script>")); expectFalse(html.contains("href=\"javascript:"))
-        expectFalse(html.contains("src=\"https://")); expectTrue(html.contains("&lt;script&gt;"))
+        expectFalse(html.contains("<img src=\"https://")); expectTrue(html.contains("&lt;script&gt;"))
+    }
+    func testRemoteImagesStayBlockedUntilRequested() {
+        let html = MarkdownRenderer.render("![A & B](https://example.com/image.png?a=1&b=2)").html
+        expectTrue(html.contains("data-remote-src=\"https://example.com/image.png?a=1&amp;b=2\""))
+        expectTrue(html.contains("data-alt=\"A &amp; B\""))
+        expectTrue(html.contains("[Remote image: A &amp; B]"))
+        expectFalse(html.contains("<img"))
+        for source in ["javascript:alert", "data:image/png;base64,abc", "file:///tmp/a.png", "//example.com/a.png", "https://user:password@example.com/a.png"] {
+            let blocked = MarkdownRenderer.render("![blocked](\(source))").html
+            expectFalse(blocked.contains("data-remote-src="))
+            expectFalse(blocked.contains("<img"))
+        }
     }
     func testCodeAndAttributeValuesAreEscaped() {
         let html = MarkdownRenderer.render("`<img src=x onerror=bad>`\n\n[link](https://example.com/?a=1&b=2)").html
@@ -356,6 +368,7 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testFrontMatterIsHiddenWithOriginalSourceOffsets", suite.testFrontMatterIsHiddenWithOriginalSourceOffsets),
             ("testFrontMatterDetectionPreservesOrdinaryMarkdown", suite.testFrontMatterDetectionPreservesOrdinaryMarkdown),
             ("testRendererDoesNotExecuteRawHTMLOrUnsafeLinks", suite.testRendererDoesNotExecuteRawHTMLOrUnsafeLinks),
+            ("testRemoteImagesStayBlockedUntilRequested", suite.testRemoteImagesStayBlockedUntilRequested),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
         for (name, test) in tests {

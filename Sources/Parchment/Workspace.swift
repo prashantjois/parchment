@@ -19,6 +19,7 @@ struct JumpRequest { var id = UUID(); var range: NSRange }
     @Published var commentDraftAnchor: CommentAnchor?
     @Published var isDirty = false
     @Published var saveMessage = ""
+    @Published var loadedRemoteImages: Set<String> = []
     @Published var browserRoot: URL
     @Published var browserExpanded: Set<String> = []
     @Published var integrationAttachment: JSON = .object(["status": .string("unattached")])
