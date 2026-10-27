@@ -29,6 +29,22 @@ final class CoreTests {
             "parchment://open?path=/tmp/a.md&line=1&line=2"
         ] { expectThrows(try DocumentLink(url: URL(string: value)!)) }
     }
+    func testDirectDocumentLinks() throws {
+        let simple = try DocumentLink(url: URL(string: "parchment://Users/me/notes.md?line=42")!)
+        expectEqual(simple.fileURL.path, "/Users/me/notes.md")
+        expectEqual(simple.line, 42)
+        expectEqual(try DocumentLink.url(for: simple.fileURL, line: 42).absoluteString, "parchment://Users/me/notes.md?line=42")
+        let triple = try DocumentLink(url: URL(string: "parchment:///Users/me/Caf%C3%A9%20%2B%20%23.md")!)
+        expectEqual(triple.fileURL.path, "/Users/me/Café + #.md")
+        let literal = try DocumentLink(url: URL(string: "parchment://tmp/literal%2520name.md")!)
+        expectEqual(literal.fileURL.path, "/tmp/literal%20name.md")
+        for value in ["parchment://Users/me/a.md?line=0", "parchment://Users/me/a.md?line=2&line=3",
+                      "parchment://Users/me/a.md?session_token=secret", "parchment://Users/me/a.md#fragment",
+                      "parchment://user@Users/me/a.md", "parchment://Users:80/me/a.md", "parchment://Users/me/a%00.md",
+                      "parchment://Users/me/a.sh", "parchment:////remote/a.md"] {
+            expectThrows(try DocumentLink(url: URL(string: value)!))
+        }
+    }
     func testDocumentLinkLineLocations() throws {
         let file = URL(fileURLWithPath: "/tmp/a.md")
         let second = try DocumentLink(url: DocumentLink.url(for: file, line: 2))
@@ -317,6 +333,7 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
         let tests: [(String, () throws -> Void)] = [
             ("testDocumentLinksRoundTripSpecialPaths", suite.testDocumentLinksRoundTripSpecialPaths),
             ("testDocumentLinksRejectInvalidRequests", suite.testDocumentLinksRejectInvalidRequests),
+            ("testDirectDocumentLinks", suite.testDirectDocumentLinks),
             ("testDocumentLinkLineLocations", suite.testDocumentLinkLineLocations),
             ("testAnchorSurvivesInsertionsWithUnicode", suite.testAnchorSurvivesInsertionsWithUnicode),
             ("testAnchorRefusesChangedTextAndAmbiguousMatches", suite.testAnchorRefusesChangedTextAndAmbiguousMatches),

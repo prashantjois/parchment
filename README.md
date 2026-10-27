@@ -85,7 +85,7 @@ The loadable [Parchment agent skill](skills/parchment/SKILL.md) makes Parchment 
 
 ## Parchment links
 
-Links such as `parchment://open?path=%2FUsers%2Fme%2Fnotes.md&line=42` open or focus a local file in Parchment. The optional line number is one-based. Paths must be absolute and percent-encoded as a query value. Spaces use `%20`; literal plus signs use `%2B`.
+Links such as `parchment://Users/me/notes.md?line=42` open or focus a local file in Parchment. The path after `parchment://` names an absolute local file. The optional line number is one-based. Encode spaces as `%20` and reserved characters such as `+`, `#`, `%`, and `?`. Existing `parchment://open?path=...&line=42` links also work.
 
 In cmux, Cmd-click a Parchment hyperlink to open it without changing cmux's file-preview settings. Terminal programs can emit OSC 8 hyperlinks when their Markdown renderer does not support custom URL schemes. The [agent skill](skills/parchment/SKILL.md) includes examples.
 

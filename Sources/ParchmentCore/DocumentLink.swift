@@ -7,18 +7,28 @@ public struct DocumentLink {
 
     public init(url: URL) throws {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              parts.scheme?.lowercased() == "parchment", parts.host?.lowercased() == "open",
+              parts.scheme?.lowercased() == "parchment", url.absoluteString.lowercased().hasPrefix("parchment://"),
               parts.user == nil, parts.password == nil, parts.port == nil,
-              parts.path.isEmpty || parts.path == "/", parts.fragment == nil else {
+              parts.fragment == nil else {
             throw DocumentLinkError.invalidFormat
         }
         let items = parts.queryItems ?? []
-        guard items.allSatisfy({ ["path", "line"].contains($0.name) }),
-              items.filter({ $0.name == "path" }).count == 1,
-              items.filter({ $0.name == "line" }).count <= 1,
-              let path = items.first(where: { $0.name == "path" })?.value else {
-            throw DocumentLinkError.invalidFormat
+        let path: String
+        if parts.host?.lowercased() == "open", parts.path.isEmpty || parts.path == "/" {
+            // Keep existing query-style links working.
+            guard items.allSatisfy({ ["path", "line"].contains($0.name) }),
+                  items.filter({ $0.name == "path" }).count == 1,
+                  let value = items.first(where: { $0.name == "path" })?.value else {
+                throw DocumentLinkError.invalidFormat
+            }
+            path = value
+        } else {
+            guard items.allSatisfy({ $0.name == "line" }) else { throw DocumentLinkError.invalidFormat }
+            let root = parts.host ?? ""
+            guard !root.contains("/") else { throw DocumentLinkError.invalidPath }
+            path = root.isEmpty ? parts.path : "/" + root + parts.path
         }
+        guard items.filter({ $0.name == "line" }).count <= 1 else { throw DocumentLinkError.invalidFormat }
         guard path.hasPrefix("/"), !path.hasPrefix("//"),
               !path.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
             throw DocumentLinkError.invalidPath
@@ -39,9 +49,9 @@ public struct DocumentLink {
 
     public static func url(for file: URL, line: Int? = nil) throws -> URL {
         guard file.isFileURL else { throw DocumentLinkError.invalidPath }
-        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/")
         guard let path = file.standardizedFileURL.path.addingPercentEncoding(withAllowedCharacters: unreserved),
-              let result = URL(string: "parchment://open?path=" + path + (line.map { "&line=\($0)" } ?? "")) else {
+              let result = URL(string: "parchment://" + path.dropFirst() + (line.map { "?line=\($0)" } ?? "")) else {
             throw DocumentLinkError.invalidFormat
         }
         _ = try DocumentLink(url: result)
@@ -65,7 +75,7 @@ public enum DocumentLinkError: LocalizedError {
     case invalidFormat, invalidPath, invalidLine, unsupportedFile
     public var errorDescription: String? {
         switch self {
-        case .invalidFormat: return "Use parchment://open?path=ENCODED_ABSOLUTE_PATH with an optional positive line number."
+        case .invalidFormat: return "Use parchment://Users/me/notes.md with an optional ?line=42."
         case .invalidPath: return "Parchment links require an absolute local file path without control characters."
         case .invalidLine: return "The line number must be a positive integer."
         case .unsupportedFile: return "Parchment links can open Markdown and plain-text files only."
