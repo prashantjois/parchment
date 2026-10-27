@@ -1,0 +1,53 @@
+/* Parchment Theme CSS v1: Ocean */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Ocean";
+    --pt-theme-version: 1;
+    --pt-font-body: "Helvetica Neue", sans-serif;
+    --pt-font-heading: var(--pt-font-body);
+    --pt-font-code: Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.65;
+    --pt-content-width: 100%;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #f2f8fc;
+    --pt-surface: #e1eef6;
+    --pt-text: #19354a;
+    --pt-muted: #4c687b;
+    --pt-heading: #112d42;
+    --pt-link: #006d8f;
+    --pt-border: #b8d1e1;
+    --pt-code: #7e4169;
+    --pt-mark-background: #fff0ad;
+    --pt-mark-text: #242424;
+    --pt-selection-background: #006d8f;
+    --pt-selection-text: #f2f8fc;
+    --pt-syntax-comment: #4c687b;
+    --pt-syntax-keyword: #7e4169;
+    --pt-syntax-string: #21623b;
+    --pt-syntax-number: #8a4a12;
+    --pt-syntax-function: #006d8f;
+    --pt-syntax-type: #7e4169;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #102332;
+    --pt-surface: #193345;
+    --pt-text: #dcecf5;
+    --pt-muted: #9ebdce;
+    --pt-heading: #f0f9ff;
+    --pt-link: #73d0eb;
+    --pt-border: #35566a;
+    --pt-code: #e9acd5;
+    --pt-mark-background: #65501e;
+    --pt-mark-text: #fff3c4;
+    --pt-selection-background: #73d0eb;
+    --pt-selection-text: #102332;
+    --pt-syntax-comment: #9ebdce;
+    --pt-syntax-keyword: #e9acd5;
+    --pt-syntax-string: #a7d7ac;
+    --pt-syntax-number: #f2c18e;
+    --pt-syntax-function: #73d0eb;
+    --pt-syntax-type: #e9acd5;
+  }
+}

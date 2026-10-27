@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+
+# For an offline volume, Launch Services will register the app on its first launch.
+[[ "${3:-/}" == "/" ]] || exit 0
+app_directory="/Applications/Parchment.app"
+[[ -d "$app_directory" ]] || exit 0
+console_user="$(/usr/bin/stat -f '%Su' /dev/console)"
+case "$console_user" in root|loginwindow|_mbsetupuser|"") exit 0 ;; esac
+console_uid="$(/usr/bin/id -u "$console_user")"
+registrar="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -n -u "$console_user" "$registrar" -f "$app_directory"; then
+    printf 'Parchment will register its URL scheme on its first launch.\n'
+fi
+exit 0

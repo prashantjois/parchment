@@ -1,0 +1,39 @@
+# Swift build output and local package-manager state.
+/.build/
+/.swiftpm/
+/build/
+/dist/
+
+# Packaged applications and installers.
+*.app/
+*.pkg
+*.pkg.sha256
+*.dmg
+*.dmg.sha256
+
+# Local editor data, comments, exports, and integration state.
+*.comments.json
+*.review.json
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+session.json
+unreadable-session-*.json
+*.log
+
+# Local credentials and Python environments.
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+
+# macOS and per-user editor files.
+.DS_Store
+.AppleDouble
+xcuserdata/
+*.xcuserstate
+*.swp
+*.swo
+*~

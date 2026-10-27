@@ -1,0 +1,145 @@
+@layer parchment-base, parchment-theme, parchment-user;
+
+@layer parchment-base {
+  .markdown-doc {
+    --pt-font-body: -apple-system, BlinkMacSystemFont, sans-serif;
+    --pt-font-heading: var(--pt-font-body);
+    --pt-font-code: Menlo, monospace;
+    --pt-font-size: 16px;
+    --pt-line-height: 1.65;
+    --pt-content-width: 100%;
+    --pt-document-padding: 16px;
+    --pt-block-gap: 1em;
+    --pt-h1-size: 2.25em;
+    --pt-h2-size: 1.75em;
+    --pt-h3-size: 1.5em;
+    --pt-h4-size: 1.25em;
+    --pt-h5-size: 1.125em;
+    --pt-h6-size: 1em;
+    --pt-heading-weight: 650;
+    --pt-heading-line-height: 1.25;
+    --pt-background: #ffffff;
+    --pt-surface: #f3f4f6;
+    --pt-text: #242424;
+    --pt-muted: #62646a;
+    --pt-heading: #171717;
+    --pt-link: #075fbd;
+    --pt-border: #d5d7dc;
+    --pt-code: #8a254b;
+    --pt-mark-background: #fff0ad;
+    --pt-mark-text: #242424;
+    --pt-selection-background: #cde2ff;
+    --pt-selection-text: #171717;
+    --pt-syntax-comment: #62646a;
+    --pt-syntax-keyword: #7139a8;
+    --pt-syntax-string: #21623b;
+    --pt-syntax-number: #8a4a12;
+    --pt-syntax-function: #075fbd;
+    --pt-syntax-type: #8a254b;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: var(--pt-document-padding) max(var(--pt-document-padding), calc((100% - var(--pt-content-width)) / 2));
+    background: var(--pt-background);
+    color: var(--pt-text);
+    font-family: var(--pt-font-body);
+    font-size: var(--pt-font-size);
+    line-height: var(--pt-line-height);
+    overflow-wrap: anywhere;
+    color-scheme: light;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #1c1c1e;
+    --pt-surface: #2a2a2e;
+    --pt-text: #f2f2f7;
+    --pt-muted: #b0b0b8;
+    --pt-heading: #ffffff;
+    --pt-link: #8cbfff;
+    --pt-border: #48484f;
+    --pt-code: #f0a5c1;
+    --pt-mark-background: #65501e;
+    --pt-mark-text: #fff3c4;
+    --pt-selection-background: #34577f;
+    --pt-selection-text: #ffffff;
+    --pt-syntax-comment: #b0b0b8;
+    --pt-syntax-keyword: #d5adff;
+    --pt-syntax-string: #a7d7ac;
+    --pt-syntax-number: #f2c18e;
+    --pt-syntax-function: #8cbfff;
+    --pt-syntax-type: #f0a5c1;
+    color-scheme: dark;
+  }
+  .markdown-doc *, .markdown-doc *::before, .markdown-doc *::after { box-sizing: border-box; }
+  .markdown-doc::selection, .markdown-doc ::selection {
+    background: var(--pt-selection-background);
+    color: var(--pt-selection-text);
+  }
+  .markdown-doc :is(h1, h2, h3, h4, h5, h6) {
+    margin: 1.5em 0 0.6em;
+    color: var(--pt-heading);
+    font-family: var(--pt-font-heading);
+    font-weight: var(--pt-heading-weight);
+    line-height: var(--pt-heading-line-height);
+    scroll-margin-top: 1em;
+  }
+  .markdown-doc h1 { font-size: var(--pt-h1-size); }
+  .markdown-doc h2 { font-size: var(--pt-h2-size); }
+  .markdown-doc h3 { font-size: var(--pt-h3-size); }
+  .markdown-doc h4 { font-size: var(--pt-h4-size); }
+  .markdown-doc h5 { font-size: var(--pt-h5-size); }
+  .markdown-doc h6 { font-size: var(--pt-h6-size); }
+  .markdown-doc > :first-child { margin-top: 0; }
+  .markdown-doc :is(p, ul, ol, dl, pre, blockquote, figure, details, .table-scroll, .math-block, .diagram) {
+    margin-block: 0 var(--pt-block-gap);
+  }
+  .markdown-doc strong { font-weight: 700; }
+  .markdown-doc em { font-style: italic; }
+  .markdown-doc del { text-decoration: line-through; }
+  .markdown-doc mark { background: var(--pt-mark-background); color: var(--pt-mark-text); }
+  .markdown-doc a { color: var(--pt-link); text-decoration: underline; text-underline-offset: 0.15em; }
+  .markdown-doc a:hover { text-decoration-thickness: 0.12em; }
+  .markdown-doc img { max-width: 100%; height: auto; vertical-align: middle; }
+  .markdown-doc figure { margin-inline: 0; }
+  .markdown-doc figcaption { margin-top: 0.5em; color: var(--pt-muted); font-size: 0.875em; text-align: center; }
+  .markdown-doc :is(ul, ol) { padding-inline-start: 1.75em; }
+  .markdown-doc li { margin-block: 0.2em; }
+  .markdown-doc li > :is(ul, ol) { margin-bottom: 0; }
+  .markdown-doc li::marker { color: var(--pt-muted); }
+  .markdown-doc .task-list-item { list-style: none; }
+  .markdown-doc .task-list-item > input[type="checkbox"] { margin-inline: -1.3em 0.5em; accent-color: var(--pt-link); }
+  .markdown-doc blockquote { margin-inline: 0; padding: 0.25em 1em; border-inline-start: 3px solid var(--pt-link); color: var(--pt-muted); }
+  .markdown-doc blockquote > :last-child { margin-bottom: 0; }
+  .markdown-doc code { font-family: var(--pt-font-code); font-size: 0.875em; }
+  .markdown-doc :not(pre) > code { padding: 0.15em 0.35em; border-radius: 4px; background: var(--pt-surface); color: var(--pt-code); }
+  .markdown-doc pre { overflow-x: auto; padding: 1em; border: 1px solid var(--pt-border); border-radius: 8px; background: var(--pt-surface); color: var(--pt-text); line-height: 1.5; white-space: pre; overflow-wrap: normal; }
+  .markdown-doc pre > code { padding: 0; background: transparent; color: inherit; }
+  .markdown-doc .token.comment { color: var(--pt-syntax-comment); font-style: italic; }
+  .markdown-doc .token.keyword { color: var(--pt-syntax-keyword); }
+  .markdown-doc .token.string { color: var(--pt-syntax-string); }
+  .markdown-doc .token.number { color: var(--pt-syntax-number); }
+  .markdown-doc .token.function { color: var(--pt-syntax-function); }
+  .markdown-doc .token.type { color: var(--pt-syntax-type); }
+  .markdown-doc .table-scroll { overflow-x: auto; }
+  .markdown-doc table { width: 100%; border-collapse: collapse; }
+  .markdown-doc :is(th, td) { padding: 0.6em 0.8em; border: 1px solid var(--pt-border); text-align: start; }
+  .markdown-doc th { background: var(--pt-surface); color: var(--pt-heading); font-weight: 700; }
+  .markdown-doc tbody tr:nth-child(even) { background: var(--pt-surface); }
+  .markdown-doc [data-align="left"] { text-align: left; }
+  .markdown-doc [data-align="center"] { text-align: center; }
+  .markdown-doc [data-align="right"] { text-align: right; }
+  .markdown-doc hr { margin-block: 2em; border: 0; border-top: 1px solid var(--pt-border); }
+  .markdown-doc [data-footnotes] { margin-top: 2em; padding-top: 1em; border-top: 1px solid var(--pt-border); color: var(--pt-muted); font-size: 0.875em; }
+  .markdown-doc a[data-footnote-ref] { font-size: 0.8em; vertical-align: super; }
+  .markdown-doc dt { font-weight: 700; }
+  .markdown-doc dd { margin-inline-start: 1.5em; margin-bottom: 0.5em; }
+  .markdown-doc kbd { padding: 0.1em 0.35em; border: 1px solid var(--pt-border); border-radius: 4px; background: var(--pt-surface); font: 0.85em var(--pt-font-code); }
+  .markdown-doc :is(sup, sub) { font-size: 0.75em; line-height: 0; }
+  .markdown-doc sup { vertical-align: super; }
+  .markdown-doc sub { vertical-align: sub; }
+  .markdown-doc details { padding: 0.75em 1em; border: 1px solid var(--pt-border); border-radius: 6px; }
+  .markdown-doc summary { color: var(--pt-heading); font-weight: 650; cursor: pointer; }
+  .markdown-doc details[open] > summary { margin-bottom: 0.75em; }
+  .markdown-doc :is(.math-block, .diagram) { overflow-x: auto; padding: 1em; text-align: center; }
+  .markdown-doc .math-inline { font-size: 1em; }
+}

@@ -1,0 +1,53 @@
+/* Parchment Theme CSS v1: Nordic */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Nordic";
+    --pt-theme-version: 1;
+    --pt-font-body: "Avenir Next", sans-serif;
+    --pt-font-heading: var(--pt-font-body);
+    --pt-font-code: Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.65;
+    --pt-content-width: 100%;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #eceff4;
+    --pt-surface: #e1e6ee;
+    --pt-text: #2e3440;
+    --pt-muted: #566273;
+    --pt-heading: #202733;
+    --pt-link: #326b83;
+    --pt-border: #bec8d5;
+    --pt-code: #775379;
+    --pt-mark-background: #fff0ad;
+    --pt-mark-text: #242424;
+    --pt-selection-background: #326b83;
+    --pt-selection-text: #eceff4;
+    --pt-syntax-comment: #566273;
+    --pt-syntax-keyword: #775379;
+    --pt-syntax-string: #21623b;
+    --pt-syntax-number: #8a4a12;
+    --pt-syntax-function: #326b83;
+    --pt-syntax-type: #775379;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #2e3440;
+    --pt-surface: #3b4252;
+    --pt-text: #eceff4;
+    --pt-muted: #b6c2d2;
+    --pt-heading: #ffffff;
+    --pt-link: #88c0d0;
+    --pt-border: #596579;
+    --pt-code: #d6acd1;
+    --pt-mark-background: #65501e;
+    --pt-mark-text: #fff3c4;
+    --pt-selection-background: #88c0d0;
+    --pt-selection-text: #2e3440;
+    --pt-syntax-comment: #b6c2d2;
+    --pt-syntax-keyword: #d6acd1;
+    --pt-syntax-string: #a7d7ac;
+    --pt-syntax-number: #f2c18e;
+    --pt-syntax-function: #88c0d0;
+    --pt-syntax-type: #d6acd1;
+  }
+}
