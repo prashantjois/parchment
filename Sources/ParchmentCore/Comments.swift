@@ -67,7 +67,7 @@ public struct CommentAnchor: Codable, Equatable {
 }
 
 public struct AnchorMatch: Codable, Equatable {
-    public enum State: String, Codable { case exact, moved, ambiguous, orphaned }
+    public enum State: String, Codable { case exact, moved, ambiguous, orphaned, file }
     public var state: State
     public var range: TextSpan?
     public init(state: State, range: TextSpan? = nil) { self.state = state; self.range = range }
@@ -92,17 +92,22 @@ public struct CommentEvent: Codable, Identifiable {
 }
 
 public struct CommentThread: Codable, Identifiable {
+    public enum Scope: String, Codable { case file }
+    public var scope: Scope?
+    public var isFileLevel: Bool { scope == .file }
     public var id: UUID
     public var originalAnchor: CommentAnchor
     public var events: [CommentEvent]
     public var reviewID: UUID?
     public var publishedAt: Date?
     public var isPending: Bool { reviewID != nil && publishedAt == nil }
-    public init(anchor: CommentAnchor, body: String, author: String, reviewID: UUID? = nil) {
+    public init(anchor: CommentAnchor, body: String, author: String, reviewID: UUID? = nil, fileLevel: Bool = false) {
         id = UUID(); originalAnchor = anchor; self.reviewID = reviewID
+        scope = fileLevel ? .file : nil
         events = [CommentEvent(kind: .comment, author: author, body: body, reviewID: reviewID)]
     }
     public var anchor: CommentAnchor { events.last(where: { $0.kind == .reanchor })?.anchor ?? originalAnchor }
+    public func locate(in text: String) -> AnchorMatch { isFileLevel ? AnchorMatch(state: .file) : anchor.locate(in: text) }
     public var isResolved: Bool { events.last(where: { $0.kind == .resolve || $0.kind == .reopen })?.kind == .resolve }
     public var messages: [CommentEvent] { events.filter { $0.kind == .comment || $0.kind == .reply } }
 }
@@ -126,12 +131,13 @@ public struct CommentFile: Codable {
     public var reviews: [CommentReview]?
     public var activeReview: CommentReview? { reviews?.last(where: \.isPending) }
     public var pendingCount: Int { threads.flatMap(\.messages).filter(\.isPending).count }
+    public var encodingVersion: Int { max(formatVersion, threads.contains(where: \.isFileLevel) ? 3 : 2) }
     public init(document: String, threads: [CommentThread] = []) { self.document = document; self.threads = threads }
     @discardableResult public mutating func startReview(author: String) -> UUID {
         if let activeReview { return activeReview.id }
         let review = CommentReview(author: author)
         if reviews == nil { reviews = [] }; reviews!.append(review)
-        formatVersion = 2
+        formatVersion = encodingVersion
         return review.id
     }
     @discardableResult public mutating func submitReview(summary: String = "", at date: Date = Date()) -> Bool {
@@ -158,15 +164,15 @@ public struct CommentFile: Codable {
         let companion = companionURL(for: url)
         guard FileManager.default.fileExists(atPath: companion.path) else { return CommentFile(document: url.lastPathComponent) }
         var value = try decoder.decode(CommentFile.self, from: Data(contentsOf: companion))
-        guard [1, 2].contains(value.formatVersion) else { throw CommentError.unsupportedVersion }
+        guard [1, 2, 3].contains(value.formatVersion) else { throw CommentError.unsupportedVersion }
         guard value.document == url.lastPathComponent || value.documentID != nil else { throw CommentError.wrongDocument }
         value.document = url.lastPathComponent
-        value.formatVersion = 2
+        value.formatVersion = value.encodingVersion
         return value
     }
     public func write(for url: URL) throws {
         var updated = self
-        updated.formatVersion = 2
+        updated.formatVersion = encodingVersion
         updated.document = url.lastPathComponent
         try Self.encoder.encode(updated).write(to: Self.companionURL(for: url), options: .atomic)
     }
@@ -187,12 +193,12 @@ public struct CommentFile: Codable {
             let threads: [ThreadExport]
             let reviews: [CommentReview]
         }
-        return try Self.encoder.encode(Export(formatVersion: 2, documentPath: path, sourceSHA256: sourceHash(text), sourceText: text,
+        return try Self.encoder.encode(Export(formatVersion: encodingVersion, documentPath: path, sourceSHA256: sourceHash(text), sourceText: text,
             offsetEncoding: "UTF-16 code units; zero-based location, exclusive end; original line endings",
             threads: threads.filter { !$0.isPending && (includeResolved || !$0.isResolved) }.map {
                 var published = $0
                 published.events.removeAll(where: \.isPending)
-                return ThreadExport(thread: published, resolved: published.isResolved, currentAnchor: published.anchor.locate(in: text))
+                return ThreadExport(thread: published, resolved: published.isResolved, currentAnchor: published.locate(in: text))
             }, reviews: (reviews ?? []).filter { $0.submittedAt != nil }))
     }
 }

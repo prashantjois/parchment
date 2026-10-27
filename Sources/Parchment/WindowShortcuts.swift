@@ -2,11 +2,12 @@ import AppKit
 import SwiftUI
 
 enum EditorShortcut: String, CaseIterable {
-    case comment = "m", split = "s", rendered = "r", raw = "e", files = "n", contents = "t"
+    case comment = "m", fileComment = "M", split = "s", rendered = "r", raw = "e", files = "n", contents = "t"
     static func action(for event: NSEvent) -> EditorShortcut? {
-        guard event.type == .keyDown,
-              event.modifierFlags.intersection([.command, .control, .option, .shift]) == .control,
-              let characters = event.charactersIgnoringModifiers?.lowercased() else { return nil }
+        guard event.type == .keyDown, let characters = event.charactersIgnoringModifiers?.lowercased() else { return nil }
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if modifiers == [.control, .shift], characters == "m" || characters == "\r" { return .fileComment }
+        guard modifiers == .control else { return nil }
         if let action = Self(rawValue: characters) { return action }
         // Some keyboard layouts report a control character instead of its letter.
         if characters.unicodeScalars.count == 1, let value = characters.unicodeScalars.first?.value, (1...26).contains(value) {
@@ -17,6 +18,7 @@ enum EditorShortcut: String, CaseIterable {
     @MainActor func perform(in workspace: Workspace) {
         switch self {
         case .comment: workspace.beginComment()
+        case .fileComment: workspace.beginFileComment()
         case .split: workspace.toggleSplit()
         case .rendered: workspace.showSinglePane(.rendered)
         case .raw: workspace.showSinglePane(.raw)

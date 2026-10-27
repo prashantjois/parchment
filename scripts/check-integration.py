@@ -320,6 +320,24 @@ def main():
             assert (state / "integration.sqlite").stat().st_mode & 0o777 == 0o600
             assert socket_root.stat().st_mode & 0o777 == 0o700
             passed("registry stores hashed tokens and restricts local transport permissions")
+            empty = root / "file-comments.md"
+            empty.write_text("")
+            opened_file = a.tool("open_document", {"path": str(empty), "attach": True, "session_token": first["session_token"], "activate": False})
+            file_ref = {"document_id": opened_file["document_id"]}
+            file_auth = dict(session_token=first["session_token"], binding_id=opened_file["binding"]["binding_id"], generation=opened_file["binding"]["generation"])
+            local("test_file_comment", **file_ref, body="Private file review", pending=True)
+            assert a.tool("get_feedback", file_auth)["events"] == []
+            local("test_submit_review", **file_ref, summary="Review the whole file")
+            file_feedback = a.tool("get_feedback", file_auth)
+            file_thread = file_feedback["events"][0]["feedback"]["threads"][0]
+            assert file_thread["thread"]["scope"] == "file" and file_thread["current_anchor"]["state"] == "file"
+            live_file = a.tool("get_document", file_ref)
+            a.tool("apply_patch", dict(file_auth, operation_id=str(uuid.uuid4()), expected_revision=live_file["revision"], edits=[{"old_text":"", "new_text":"# New contents\n", "start":0}]))
+            local("test_close", **file_ref)
+            reopened_file = a.tool("get_document", file_ref)
+            assert reopened_file["comments"]["threads"][0]["currentAnchor"]["state"] == "file"
+            assert json.loads(Path(str(empty) + ".comments.json").read_text())["formatVersion"] == 3
+            passed("file-level reviews stay private, publish through MCP, and survive edits and reopening")
             print(f"All {checks} integration checks passed.")
         except Exception:
             log.flush()

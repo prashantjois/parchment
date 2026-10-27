@@ -410,6 +410,26 @@ final class CoreTests {
         state.markUnread(draft)
         expectFalse(state.isUnread(draft, reader: "Reader"))
     }
+    func testFileCommentsRemainAnchoredAcrossEditsAndRoundTrip() throws {
+        let anchor = CommentAnchor(text: "", range: TextSpan(location: 0, length: 0))
+        let thread = CommentThread(anchor: anchor, body: "Review this file", author: "Reviewer", fileLevel: true)
+        expectEqual(thread.locate(in: "").state, .file)
+        expectEqual(thread.locate(in: "Completely replaced text").state, .file)
+        expectNil(thread.locate(in: "New text").range)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("empty.md")
+        let file = CommentFile(document: "empty.md", threads: [thread])
+        try file.write(for: path)
+        let saved = try CommentFile.read(for: path)
+        expectEqual(saved.formatVersion, 3)
+        expectTrue(saved.threads[0].isFileLevel)
+        let exported = try JSONSerialization.jsonObject(with: saved.export(text: "Changed", path: path.path, includeResolved: true)) as! [String: Any]
+        let value = (exported["threads"] as! [[String: Any]])[0]
+        expectEqual((value["currentAnchor"] as! [String: Any])["state"] as? String, "file")
+        expectEqual((value["thread"] as! [String: Any])["scope"] as? String, "file")
+    }
     func testCodeAndAttributeValuesAreEscaped() {
         let html = MarkdownRenderer.render("`<img src=x onerror=bad>`\n\n[link](https://example.com/?a=1&b=2)").html
         expectTrue(html.contains("&lt;img")); expectFalse(html.contains("<img src=x"))
@@ -467,6 +487,7 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testRendererPreservesLocalAndExternalNavigationLinks", suite.testRendererPreservesLocalAndExternalNavigationLinks),
             ("testCommentReadStateTracksRepliesWithoutChangingDiscussion", suite.testCommentReadStateTracksRepliesWithoutChangingDiscussion),
             ("testPendingRepliesDoNotBecomeUnreadUntilPublished", suite.testPendingRepliesDoNotBecomeUnreadUntilPublished),
+            ("testFileCommentsRemainAnchoredAcrossEditsAndRoundTrip", suite.testFileCommentsRemainAnchoredAcrossEditsAndRoundTrip),
             ("testCodeAndAttributeValuesAreEscaped", suite.testCodeAndAttributeValuesAreEscaped),
         ]
         for (name, test) in tests {

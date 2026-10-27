@@ -155,7 +155,7 @@ struct SourcePane: NSViewRepresentable {
         }
         text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: (text.string as NSString).length))
         for thread in document.comments.threads where !thread.isResolved {
-            if let range = thread.anchor.locate(in: document.text).range {
+            if let range = thread.locate(in: document.text).range {
                 text.layoutManager?.addTemporaryAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(thread.id == document.selectedThread ? 0.4 : 0.18), forCharacterRange: range.nsRange)
             }
         }

@@ -159,7 +159,7 @@ struct CommentsSidebar: View {
             } else {
                 Button("Start a Review") { document.startReview(); filter = "Pending" }.buttonStyle(.borderless).padding(.horizontal, 14).padding(.bottom, 12)
             }
-            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Unread").tag("Unread"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.segmented).controlSize(.small).padding(.horizontal, 10).padding(.bottom, 10)
+            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Unread").tag("Unread"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.menu).controlSize(.small).padding(.horizontal, 10).padding(.bottom, 10)
             Divider()
             ScrollViewReader { reader in
                 ScrollView {
@@ -213,7 +213,7 @@ struct ThreadCard: View {
     @ViewState<Bool> private var history = false
     @ViewState<UUID?> private var editingMessage: UUID?
     @ViewState<String> private var editedBody = ""
-    var match: AnchorMatch { thread.anchor.locate(in: document.text) }
+    var match: AnchorMatch { thread.locate(in: document.text) }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if !thread.isPending {
@@ -241,14 +241,15 @@ struct ThreadCard: View {
     var discussion: some View {
         VStack(alignment: .leading, spacing: 10) {
             if thread.isPending { Label("Pending review", systemImage: "clock").font(.caption.bold()).foregroundStyle(.orange) }
+            if thread.isFileLevel { Label("File comment", systemImage: "doc.text").font(.caption.bold()).foregroundStyle(.secondary) }
             Button { document.selectThread(thread) } label: {
                 HStack(alignment: .top) {
                     Rectangle().fill(.yellow).frame(width: 3)
-                    Text(thread.anchor.quote).font(.caption).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(thread.isFileLevel ? "Entire file · \(document.title)" : thread.anchor.quote).font(.caption).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
                     if thread.isResolved { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
                 }.fixedSize(horizontal: false, vertical: true)
             }.buttonStyle(.plain)
-            if match.range == nil {
+            if !thread.isFileLevel && match.range == nil {
                 Text(match.state == .ambiguous ? "This text occurs more than once. Select the correct text to reattach." : "The original text changed. Select text to reattach this thread.")
                     .font(.caption).foregroundStyle(.orange)
                 Button("Attach to Current Selection") {
@@ -323,13 +324,14 @@ struct CommentComposer: View {
     @ViewState<String?> private var error: String?
     @FocusState private var focused: Bool
     var quote: String {
+        if document.commentDraftIsFileLevel { return "Entire file · \(document.title)" }
         if let anchor = document.commentDraftAnchor { return anchor.quote }
         let range = TextSpan(location: document.selection.location, length: document.selection.length)
         return range.isValid(in: document.text) ? (document.text as NSString).substring(with: range.nsRange) : ""
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Add Comment").font(.title2.bold())
+            Text(document.commentDraftIsFileLevel ? "Add File Comment" : "Add Comment").font(.title2.bold())
             Text(quote).font(.callout).lineLimit(6).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             TextEditor(text: $bodyText).font(.body).frame(height: 130).focused($focused).border(.quaternary)
             if let error { Text(error).font(.caption).foregroundStyle(.red) }
@@ -347,7 +349,7 @@ struct CommentComposer: View {
             }
             Text(document.comments.activeReview == nil ? "Comment now publishes immediately. Start a review keeps your comments pending until submission." : "Review comments stay pending until you submit the review. Comment now publishes this comment immediately.").font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(width: 560).onAppear { focused = true }
-            .onDisappear { document.commentDraftAnchor = nil }
+            .onDisappear { document.commentDraftAnchor = nil; document.commentDraftIsFileLevel = false }
     }
     var cannotSubmit: Bool { bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || quote.isEmpty }
     func submit(pending: Bool) {
@@ -357,7 +359,7 @@ struct CommentComposer: View {
             }
             document.selection = range.nsRange
         }
-        document.addComment(body: bodyText, pending: pending); dismiss()
+        document.addComment(body: bodyText, pending: pending, fileLevel: document.commentDraftIsFileLevel); dismiss()
     }
 }
 
@@ -373,7 +375,7 @@ struct ReviewSubmission: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(document.comments.threads.filter { $0.messages.contains(where: \.isPending) }) { thread in
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(thread.anchor.quote).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            Text(thread.isFileLevel ? "Entire file · \(document.title)" : thread.anchor.quote).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             ForEach(thread.messages.filter(\.isPending)) { message in Text(message.body ?? "").font(.callout) }
                         }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                     }

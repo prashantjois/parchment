@@ -47,7 +47,7 @@ public enum FeedbackPublication {
         let published = comments.threads.filter { !$0.isPending }
         func threadValue(_ thread: CommentThread) throws -> JSON {
             var value = thread; value.events.removeAll(where: \.isPending)
-            return .object(["thread": try JSON.encode(value), "current_anchor": try JSON.encode(value.anchor.locate(in: text))])
+            return .object(["thread": try JSON.encode(value), "current_anchor": try JSON.encode(value.locate(in: text))])
         }
         for thread in published {
             for event in thread.events where !event.isPending && event.reviewID == nil && event.origin != "agent" && !event.author.hasPrefix("🤖") && [.comment, .reply].contains(event.kind) {

@@ -252,6 +252,7 @@ import ParchmentIntegration
         if method == "test_shutdown" { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { exit(0) }; return .bool(true) }
         let document = try self.document(args)
         switch method {
+        case "test_file_comment": document.addComment(body: try args.require("body"), pending: args["pending"].bool ?? false, fileLevel: true)
         case "test_comment":
             let quote = try args.require("quote"), range = (document.text as NSString).range(of: quote)
             guard range.location != NSNotFound else { throw BridgeError("INVALID_ARGUMENT", "Test quote not found.") }

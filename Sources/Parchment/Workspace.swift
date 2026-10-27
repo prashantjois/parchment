@@ -26,6 +26,7 @@ enum DocumentSaveError: LocalizedError {
     @Published var jump: JumpRequest?
     @Published var selectedThread: UUID?
     @Published var commentDraftAnchor: CommentAnchor?
+    @Published var commentDraftIsFileLevel = false
     @Published var isDirty = false
     @Published var saveMessage = ""
     @Published var loadedRemoteImages: Set<String> = []
@@ -191,12 +192,13 @@ enum DocumentSaveError: LocalizedError {
         jump = JumpRequest(range: range, restoreScroll: restoreScroll)
         selection = range
     }
-    func addComment(body: String, pending: Bool = false) {
-        let range = TextSpan(location: selection.location, length: selection.length)
-        guard range.isValid(in: text), !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    func addComment(body: String, pending: Bool = false, fileLevel: Bool = false) {
+        let range = fileLevel ? TextSpan(location: 0, length: 0) : TextSpan(location: selection.location, length: selection.length)
+        guard (fileLevel || range.isValid(in: text)), !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let reviewID = pending ? comments.startReview(author: NSFullUserName()) : nil
-        let thread = CommentThread(anchor: CommentAnchor(text: text, range: range), body: body, author: NSFullUserName(), reviewID: reviewID)
+        let thread = CommentThread(anchor: CommentAnchor(text: text, range: range), body: body, author: NSFullUserName(), reviewID: reviewID, fileLevel: fileLevel)
         comments.threads.append(thread); selectedThread = thread.id
+        comments.formatVersion = comments.encodingVersion
         layout.showRight = true; layout.rightPanel = .comments
         isDirty = true; scheduleSave()
     }
@@ -233,7 +235,7 @@ enum DocumentSaveError: LocalizedError {
     func selectThread(_ thread: CommentThread) {
         markThreadRead(thread)
         selectedThread = thread.id; layout.showRight = true; layout.rightPanel = .comments
-        if let range = thread.anchor.locate(in: text).range { reveal(range.nsRange) }
+        if let range = thread.locate(in: text).range { reveal(range.nsRange) }
         onChange?()
     }
 }
@@ -410,6 +412,14 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         let range = TextSpan(location: active.selection.location, length: active.selection.length)
         guard range.isValid(in: active.text) else { return }
         active.commentDraftAnchor = CommentAnchor(text: active.text, range: range)
+        active.commentDraftIsFileLevel = false
+        SelectionCommentPopover.hideAll()
+        composeComment = true
+    }
+    func beginFileComment(_ document: EditorDocument? = nil) {
+        if let document { activeID = document.id }
+        guard let active else { return }
+        active.commentDraftAnchor = nil; active.commentDraftIsFileLevel = true
         SelectionCommentPopover.hideAll()
         composeComment = true
     }

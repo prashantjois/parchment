@@ -79,6 +79,7 @@ import ParchmentCore
                 Button("Outdent") { NSApp.sendAction(#selector(MarkdownTextView.outdentSelection), to: nil, from: nil) }.keyboardShortcut("[", modifiers: [.command, .option])
                 Divider()
                 Button("Add Comment") { workspace.beginComment() }.keyboardShortcut("m", modifiers: .control)
+                Button("Add File Comment") { workspace.beginFileComment() }.keyboardShortcut("m", modifiers: [.control, .shift]).disabled(workspace.active == nil)
             }
         }
         Settings { AppSettings(themes: workspace.themes) }
@@ -147,7 +148,7 @@ struct WorkspaceView: View {
                     HStack(spacing: 0) {
                         ForEach(workspace.documents) { document in
                             DocumentTab(document: document, selected: workspace.activeID == document.id,
-                                        activate: { workspace.activeID = document.id; workspace.scheduleRecovery() }, close: { workspace.close(document) })
+                                        activate: { workspace.activeID = document.id; workspace.scheduleRecovery() }, close: { workspace.close(document) }, comment: { workspace.beginFileComment(document) })
                         }
                         Spacer(minLength: 0)
                     }
@@ -188,11 +189,15 @@ struct DocumentTab: View {
     var selected: Bool
     var activate: () -> Void
     var close: () -> Void
+    var comment: () -> Void
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
             Text(document.title).font(.system(size: 12, weight: selected ? .semibold : .regular)).lineLimit(1)
+                .background(TabCommentHover(action: comment))
             if document.isDirty { Circle().fill(.secondary).frame(width: 5, height: 5) }
+            Button(action: comment) { Image(systemName: "text.bubble").font(.system(size: 11)).padding(3) }
+                .buttonStyle(.plain).help("Add File Comment (⌃⇧M)").accessibilityLabel("Add a comment to \(document.title)")
             Button(action: close) { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).padding(4) }.buttonStyle(.plain).help("Close Tab (⌘W)")
         }.padding(.horizontal, 14).frame(height: 38).frame(minWidth: 130, maxWidth: 240)
             .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
@@ -208,19 +213,23 @@ struct DocumentWorkspace: View {
     var body: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
+                let filesMaximum = max(170, min(360, geometry.size.width * 0.3))
+                let filesWidth = document.layout.showFiles ? min(max(170, document.layout.filesWidth), filesMaximum) : 0
+                let rightMaximum = max(240, min(700, geometry.size.width - filesWidth - (document.layout.showFiles ? 16 : 8) - 320))
+                let rightWidth = min(max(240, document.layout.rightWidth), rightMaximum)
                 HStack(spacing: 0) {
                     if document.layout.showFiles {
                         FileBrowser(document: document, open: workspace.open)
-                            .frame(width: min(document.layout.filesWidth, geometry.size.width * 0.3)).transition(.move(edge: .leading).combined(with: .opacity))
-                        ResizeHandle(value: $document.layout.filesWidth, limits: 170...360)
+                            .frame(width: filesWidth).contentShape(Rectangle()).clipped().transition(.move(edge: .leading).combined(with: .opacity))
+                        ResizeHandle(value: Binding(get: { filesWidth }, set: { document.layout.filesWidth = $0 }), limits: 170...filesMaximum).zIndex(1)
                     }
                     editor.frame(maxWidth: .infinity, maxHeight: .infinity)
                     if document.layout.showRight {
-                        ResizeHandle(value: $document.layout.rightWidth, limits: 240...440, direction: -1)
+                        ResizeHandle(value: Binding(get: { rightWidth }, set: { document.layout.rightWidth = $0 }), limits: 240...rightMaximum, direction: -1).zIndex(1)
                         Group {
                             if document.layout.rightPanel == .contents { ContentsSidebar(document: document) }
                             else { CommentsSidebar(document: document, beginComment: workspace.beginComment, export: workspace.exportComments) }
-                        }.frame(width: min(document.layout.rightWidth, geometry.size.width * 0.35)).transition(.move(edge: .trailing).combined(with: .opacity))
+                        }.frame(width: rightWidth).contentShape(Rectangle()).clipped().transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
             }
@@ -262,8 +271,8 @@ struct DocumentWorkspace: View {
         if document.layout.mode == .split {
             GeometryReader { geometry in
                 HStack(spacing: 0) {
-                    SourcePane(document: document, beginComment: workspace.beginComment).frame(width: max(120, (geometry.size.width - 5) * document.layout.splitFraction))
-                    ResizeHandle(value: $document.layout.splitFraction, limits: 0.2...0.8, scale: max(1, geometry.size.width - 5))
+                    SourcePane(document: document, beginComment: workspace.beginComment).frame(width: max(120, (geometry.size.width - 8) * document.layout.splitFraction))
+                    ResizeHandle(value: $document.layout.splitFraction, limits: 0.2...0.8, scale: max(1, geometry.size.width - 8))
                     RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment)
                 }
             }
@@ -282,9 +291,9 @@ struct ResizeHandle: View {
     var scale: Double = 1
     @ViewState<Double?> private var initial: Double?
     var body: some View {
-        Rectangle().fill(Color(nsColor: .separatorColor).opacity(0.5)).frame(width: 5).contentShape(Rectangle())
+        Rectangle().fill(Color(nsColor: .separatorColor).opacity(0.5)).frame(width: 8).contentShape(Rectangle())
             .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { drag in
                 if initial == nil { initial = value }
                 value = min(limits.upperBound, max(limits.lowerBound, initial! + drag.translation.width * direction / scale))
             }.onEnded { _ in initial = nil })

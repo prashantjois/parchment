@@ -2,6 +2,8 @@
 
 Parchment is an AI-native Markdown editor for macOS 14 or later. Write, review, and revise local documents together with your agent.
 
+See [Version history](docs/versions.md) for release dates, build numbers, and changes.
+
 ## Build and open
 
 The build requires Apple command-line developer tools and Swift 6.2 or later. The first build downloads Apple's Swift Markdown parser and its cmark dependency. Normal editor use requires no network connection.
@@ -27,7 +29,7 @@ In Rendered and Split modes, clicking a local file link opens or selects its tab
 
 The Back and Forward toolbar buttons navigate through files, tabs, heading jumps, and folder changes. They restore the previous selection, view mode, and scroll positions without replacing unsaved text. Use `⌘[` / `⌘]`, `⌘⌥←` / `⌘⌥→`, mouse back/forward buttons, or horizontal swipe gestures. History lasts for the current app session.
 
-The right sidebar shows either the table of contents or comments. Its two toolbar buttons select the panel. Clicking the active panel's button closes the sidebar. The file browser remains independent.
+The right sidebar shows either the table of contents or comments. Its two toolbar buttons select the panel. Clicking the active panel's button closes the sidebar. Drag its left divider to adjust the width. The file browser remains independent.
 
 | Toolbar action | Shortcut |
 | --- | --- |
@@ -41,6 +43,7 @@ The right sidebar shows either the table of contents or comments. Its two toolba
 | Themes | `⌘5` |
 | Comments | `⌘6` |
 | Add Comment | `Control-M` |
+| Add File Comment | `Control-Shift-M` |
 
 `Control-R` and `Control-E` select their views directly, including from Split mode. The toolbar Raw / Rendered button opens Rendered from Split and otherwise switches between Raw and Rendered. Turning Split off restores the previous single-pane mode. Standard commands include `⌘N`, `⌘O`, `⌘S`, `⌘⇧S`, and `⌘W`. `⌘⇧[` and `⌘⇧]` switch tabs.
 
@@ -59,6 +62,8 @@ See [the CSS theme format](docs/theming.md) and [the sample themes](themes/).
 ## Comments
 
 Select text in Raw or Rendered mode to see a small floating **Comment** button. You can also right-click the selection or press `Control-M`. The floating button preserves the selection and leaves keyboard focus in the editor.
+
+To comment on an entire file, click its tab's comment icon, hover over the tab name for the floating Comment prompt, or press `Control-Shift-M`. File comments work without a selection, including in empty files. They remain attached to the file after text changes and support the same replies, reviews, and resolution actions.
 
 The composer offers **Comment Now** for immediate publication and **Start a Review** for a pending comment. During a review, **Add to Review** adds further pending comments. **Comment Now** remains available for individual comments that need immediate publication.
 

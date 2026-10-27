@@ -73,7 +73,8 @@ import ParchmentCore
         expect(reused.documentView === text && document.undoManager.canUndo, "view switches preserve the editor and undo history")
 
         for shortcut in EditorShortcut.allCases {
-            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: 0, context: nil, characters: shortcut.rawValue, charactersIgnoringModifiers: shortcut.rawValue, isARepeat: false, keyCode: 0)!
+            let modifiers: NSEvent.ModifierFlags = shortcut == .fileComment ? [.control, .shift] : .control
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: 0, context: nil, characters: shortcut.rawValue, charactersIgnoringModifiers: shortcut.rawValue, isARepeat: false, keyCode: 0)!
             expect(EditorShortcut.action(for: event) == shortcut, "Control-\(shortcut.rawValue.uppercased()) routes to \(shortcut)")
         }
         let command = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: 0, context: nil, characters: "s", charactersIgnoringModifiers: "s", isARepeat: false, keyCode: 1)!
@@ -104,6 +105,10 @@ import ParchmentCore
             let workspace = Workspace(recoveryDirectory: directory.appendingPathComponent("recovery"))
             workspace.open(path)
             let external = workspace.active!
+            external.selection = NSRange(location: 0, length: 0)
+            EditorShortcut.fileComment.perform(in: workspace)
+            expect(workspace.composeComment && external.commentDraftIsFileLevel && external.commentDraftAnchor == nil, "Control-Shift-M opens a file comment without a text selection")
+            workspace.composeComment = false; external.commentDraftIsFileLevel = false
             defer { workspace.documents.forEach { $0.saveTask?.cancel(); $0.renderTask?.cancel(); $0.stopWatching() } }
             let linked = directory.appendingPathComponent("Linked café + #.md")
             try "# Target\n\n## Section\n".write(to: linked, atomically: true, encoding: .utf8)

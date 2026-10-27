@@ -56,6 +56,10 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
         scripts = expanded / f'Parchment-{option}.pkg/Scripts'
         assert (scripts / 'postinstall').read_bytes() == (repository / f'scripts/installer-{option}/postinstall').read_bytes()
     info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    resources = app / 'Contents/Resources'
+    assert not list(resources.rglob('*.comments.json'))
+    assert not list(resources.rglob('*.review.json'))
+    assert (resources / 'docs/versions.md').read_bytes() == (repository / 'docs/versions.md').read_bytes()
     markdown_type = next(item for item in info['UTImportedTypeDeclarations'] if item['UTTypeIdentifier'] == 'net.daringfireball.markdown')
     assert markdown_type['UTTypeTagSpecification']['public.filename-extension'] == ['md', 'markdown']
     setup = app / 'Contents/MacOS/ParchmentSetup'

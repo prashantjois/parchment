@@ -116,7 +116,7 @@ struct RenderedPane: NSViewRepresentable {
                 web.evaluateJavaScript("setRemoteImages(\(policy))", completionHandler: nil)
             }
             let ranges = doc.comments.threads.filter { !$0.isResolved }.compactMap { thread -> [String: Any]? in
-                guard let range = thread.anchor.locate(in: doc.text).range else { return nil }
+                guard let range = thread.locate(in: doc.text).range else { return nil }
                 return ["id": thread.id.uuidString, "start": range.location, "end": range.location + range.length, "active": thread.id == doc.selectedThread]
             }
             let json = String(data: try! JSONSerialization.data(withJSONObject: ranges), encoding: .utf8)!

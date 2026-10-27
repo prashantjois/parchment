@@ -132,7 +132,7 @@ Use `get_feedback` to collect published feedback for the attachment. Process eve
 
 Immediate comments and user replies arrive individually. Pending review comments and replies remain private until submission. Do not read companion files to bypass publication state.
 
-Read the latest document before acting on feedback. Anchors contain the quoted passage, surrounding context, original range, and current match status. If an anchor is ambiguous or orphaned, inspect the document and clarify unresolved ambiguity before edits.
+Read the latest document before acting on feedback. A thread with `scope: "file"` and anchor state `file` applies to the entire document. It has no text range. Do not ask to reattach a file-level comment. Selection anchors contain the quoted passage, surrounding context, original range, and current match status. If an anchor is ambiguous or orphaned, inspect the document and clarify unresolved ambiguity before edits.
 
 Use `reply_to_thread` with `thread_id`, `body`, a unique `operation_id`, and the attachment credentials. Use `resolve_thread` only when the requested change is complete and resolution fits the user's workflow. Both tools preserve history. The server labels agent replies with 🤖 and excludes them from feedback delivery.
 

@@ -1,4 +1,4 @@
-# Comment companion format, version 2
+# Comment companion format, versions 2 and 3
 
 For `notes.md`, comments live in `notes.md.comments.json`. The app writes UTF-8 JSON atomically. The Markdown file contains no comment markers.
 
@@ -6,7 +6,7 @@ The root object contains `formatVersion`, `document` (the Markdown filename), `t
 
 `documentID` gives MCP attachments a stable identity. New saves include it even when a document has no comments. Files with this identity can retain comments after a filename change. The registry gives copied companions separate identities when the original still exists.
 
-The reader accepts version 1 files and treats their comments as published. New saves use version 2. This version change prevents older readers from treating pending drafts as published comments.
+The reader accepts versions 1, 2, and 3. Version 1 comments are published. Version 2 adds pending reviews and prevents older readers from treating drafts as published comments. Companions containing file-level comments use version 3 so older readers cannot discard their scope. Selection-only companions remain compatible with version 2.
 
 ## Reviews and publication
 
@@ -19,6 +19,14 @@ Submission assigns one publication timestamp to all pending threads and events i
 Discarding a review removes its pending threads and pending replies on published threads. It preserves published discussion and records the review's discard time. Deleting a pending root comment also removes its pending thread.
 
 Pending drafts are persisted beside the document and in recovery snapshots. Consumers must respect publication state. They must not treat the raw companion file's pending records as actionable feedback.
+
+## File-level comments
+
+A thread with `scope: "file"` applies to the whole document, including an empty file. Its `originalAnchor` is an empty placeholder. Consumers must use the scope rather than interpret that placeholder as a text selection. Its current anchor has `state: "file"` and no range. File comments remain valid after edits and do not require reattachment.
+
+File comments support the same replies, publication rules, resolution, event history, and agent feedback as selection comments. The app provides a comment icon in each tab, a tab-name hover prompt, and Control-Shift-M.
+
+Read/unread state is local to the current user on this Mac. It does not modify this companion, publication state, or agent acknowledgements.
 
 ## Anchors
 
@@ -53,7 +61,7 @@ MCP replies and resolutions also contain `origin: "agent"` and `operationID`. Th
 
 Event order defines thread state. Replies have no nested reply relationships. The last resolve or reopen event determines resolution. The last reanchor event determines the active anchor.
 
-The comment panel provides Open, Pending, Resolved, and All filters. Each thread exposes its full event history. Resolved threads remain in the companion file.
+The comment panel provides Open, Unread, Pending, Resolved, and All filters. Unread threads appear first and remain visible in Open when resolved. Each thread exposes its full event history. Resolved threads remain in the companion file.
 
 ## Agent export
 
@@ -63,6 +71,6 @@ Open published threads are the default. `--include-resolved` also includes resol
 
 An agent must compare the current source hash with the exported hash before applying edits. An ambiguous or orphaned anchor requires review. Agent edits do not automatically resolve comments. Resolution is a separate action in the app or through the MCP `resolve_thread` tool.
 
-The app does not watch external edits. File-based workflows must close the document before another tool changes it. The [MCP integration](mcp.md) provides live text, published feedback, and revision-checked edits without closing the tab.
+The app watches external edits and offers a reload prompt. Keeping local text pauses autosave until an explicit save. The [MCP integration](mcp.md) provides live text, published feedback, and revision-checked edits without closing the tab.
 
 Unsaved documents retain comments in local recovery data. The first save creates the companion file beside the Markdown file. Save As creates a companion for the new file and preserves the old companion.
