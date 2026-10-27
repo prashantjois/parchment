@@ -84,7 +84,7 @@ The conversation label identifies the owner in Parchment. An optional `conversat
 
 `list_documents` reports the live app state. It returns `APP_UNAVAILABLE` when the app is closed. It does not return stale registry entries.
 
-Saved document metadata includes `open_url`, a percent-encoded `parchment://open?path=...` link. Agents can use it in Markdown or terminal hyperlinks. An optional `&line=42` selects a one-based line. Unsaved documents return `open_url: null`. Opening a link preserves the current attachment.
+Saved document metadata includes `open_url`, a link such as `parchment://Users/me/notes.md`. Agents can use it in Markdown or terminal hyperlinks. Encode spaces and reserved characters in the path. An optional `?line=42` selects a one-based line. Existing `parchment://open?path=...&line=42` links remain supported. Unsaved documents return `open_url: null`. Opening a link preserves the current attachment.
 
 Read tools can inspect published documents without ownership. Feedback delivery and mutation tools require the owning session, binding, and generation.
 
@@ -136,7 +136,7 @@ The app records an operation before mutation. After an interrupted save, it chec
 
 Patches use the native text view and document undo manager. Saved files update on disk. Unsaved documents update their local recovery snapshot. The preview follows normal editor updates.
 
-External filesystem edits still require closing and reopening the file. Agents attached through MCP must use `apply_patch` for live changes.
+Parchment watches open files for external changes and asks whether to reload them. Keeping local text pauses autosave until an explicit save. Local text and the paused state survive restarts. Reloading preserves local comments and review drafts. Agents attached through MCP must use `apply_patch` for live changes to preserve native undo and avoid external-change prompts.
 
 ## Verification
 

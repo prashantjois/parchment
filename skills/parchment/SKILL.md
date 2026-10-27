@@ -46,26 +46,26 @@ Prefer the `open_url` returned by `open_document`, `get_document`, or `list_docu
 Use this format when constructing a link:
 
 ```text
-parchment://open?path=ENCODED_ABSOLUTE_PATH
-parchment://open?path=ENCODED_ABSOLUTE_PATH&line=42
+parchment://Users/me/notes.md
+parchment://Users/me/notes.md?line=42
 ```
 
-Percent-encode the UTF-8 path as one query value. Encode spaces as `%20`, plus signs as `%2B`, and reserved characters such as `&`, `#`, `%`, and parentheses. Do not use `~`, relative paths, or a `:42` suffix. The optional `line` is one-based and selects the line start. Lines beyond the document select its end.
+Use the absolute path after `parchment://` without its leading slash. Preserve the remaining slashes. Percent-encode spaces as `%20`, plus signs as `%2B`, and reserved characters such as `&`, `#`, `%`, `?`, and parentheses. Do not use `~`, relative paths, or a `:42` suffix. The optional `line` is one-based and selects the line start. Lines beyond the document select its end. Existing query-style links remain supported.
 
 Example Markdown output:
 
 ```markdown
-[Open design notes in Parchment](parchment://open?path=%2FUsers%2Fme%2FDocuments%2FDesign%20notes.md&line=42)
+[Open design notes in Parchment](parchment://Users/me/Documents/Design%20notes.md?line=42)
 ```
 
 For terminal output, use an OSC 8 hyperlink if the renderer does not preserve custom-scheme Markdown links. This makes the target explicit instead of relying on URL detection. For example:
 
 ```python
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 path = str(Path("docs/design.md").resolve())
-url = "parchment://open?" + urlencode({"path": path}, quote_via=quote)
+url = "parchment://" + quote(path.removeprefix("/"), safe="/")
 print(f"\033]8;;{url}\033\\Open design notes in Parchment\033]8;;\033\\")
 ```
 
@@ -96,7 +96,7 @@ Example `apply_patch` arguments, using values from the preceding tool responses:
 }
 ```
 
-Use MCP for subsequent document edits. Parchment does not watch external file changes. Direct filesystem writes can conflict with its live buffer and autosave.
+Use MCP for subsequent document edits. External filesystem changes trigger a reload prompt. If the user keeps local text, autosave pauses until an explicit save. MCP edits preserve native undo and avoid these prompts.
 
 Patches update the native editor, preview, undo history, and saved file. Unsaved tabs use session recovery instead of a save dialog. Verify the resulting text with `get_document` before reporting completion.
 

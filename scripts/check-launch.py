@@ -11,7 +11,7 @@ import socket
 import subprocess
 import tempfile
 import time
-from urllib.parse import urlencode, quote, urlparse, parse_qs
+from urllib.parse import urlencode, quote, unquote, urlparse
 
 MCP = runpy.run_path(str(Path(__file__).with_name("check-integration.py")))["MCP"]
 app = Path(__file__).resolve().parent.parent / "dist/Parchment.app"
@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix="parchment-launch-") as temporary:
     try:
         document = root / "Agent café + & # % (draft).md"
         document.write_text("# Created by an agent\n\nReady for comments.\n")
-        link = "parchment://open?" + urlencode({"path": str(document), "line": 3}, quote_via=quote)
+        link = "parchment://" + quote(str(document).removeprefix("/"), safe="/") + "?line=3"
         launch = subprocess.run(["swift", str(Path(__file__).with_name("check-links.swift")), str(app), str(state), link], check=True, text=True, capture_output=True, timeout=30)
         pid = int(launch.stdout.strip())
         def matches_document(item):
@@ -40,7 +40,9 @@ with tempfile.TemporaryDirectory(prefix="parchment-launch-") as temporary:
         opened_by_link = next(item for item in listing["documents"] if matches_document(item))
         assert listing["active_document_id"] == opened_by_link["document_id"]
         assert opened_by_link["attachment"]["status"] == "unattached"
-        assert os.path.samefile(parse_qs(urlparse(opened_by_link["open_url"]).query)["path"][0], document)
+        generated = urlparse(opened_by_link["open_url"])
+        assert generated.scheme == "parchment" and not generated.query
+        assert os.path.samefile(unquote("/" + generated.netloc + generated.path), document)
         print("PASS registered parchment link launches the app and opens an encoded path without attaching an agent")
         session = helper.tool("create_session", {"client": "Launch check", "conversation_label": "Isolated launch"})
         opened = helper.tool("open_document", {"path": str(document), "attach": True, "session_token": session["session_token"], "activate": False})
