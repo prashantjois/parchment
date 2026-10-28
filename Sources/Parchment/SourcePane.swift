@@ -85,19 +85,35 @@ final class MarkdownTextView: NSTextView {
 }
 
 final class EditorScrollView: NSScrollView {
+    private var updatingDocumentSize = false
     override func scrollWheel(with event: NSEvent) {
-        if let viewport = EditorViewportScrollView.containing(self), viewport.hasHorizontalOverflow,
-           let delta = EditorViewportScrollView.horizontalDelta(for: event) {
-            viewport.scrollHorizontally(by: delta)
+        if let delta = EditorViewportScrollView.horizontalDelta(for: event) {
+            let maximum = max(0, (documentView?.frame.width ?? 0) - contentSize.width)
+            let x = min(maximum, max(0, contentView.bounds.origin.x + delta))
+            contentView.scroll(to: NSPoint(x: x, y: contentView.bounds.origin.y))
+            reflectScrolledClipView(contentView)
         } else { super.scrollWheel(with: event) }
     }
     override func tile() {
         super.tile()
-        guard let text = documentView as? NSTextView else { return }
+        updateDocumentSize()
+    }
+    func updateDocumentSize() {
+        guard !updatingDocumentSize, let text = documentView as? NSTextView,
+              let container = text.textContainer, let manager = text.layoutManager else { return }
+        updatingDocumentSize = true
+        defer { updatingDocumentSize = false }
         let viewport = contentSize
-        text.minSize = NSSize(width: 0, height: viewport.height)
-        let size = NSSize(width: viewport.width, height: max(text.frame.height, viewport.height))
+        manager.ensureLayout(for: container)
+        let used = manager.usedRect(for: container)
+        text.minSize = NSSize(width: max(EditorPaneLayout.rawMinimum, viewport.width), height: viewport.height)
+        let size = NSSize(width: max(text.minSize.width, ceil(used.maxX + 2 * text.textContainerInset.width)),
+                          height: max(viewport.height, ceil(used.maxY + 2 * text.textContainerInset.height)))
         if text.frame.size != size { text.setFrameSize(size) }
+        let origin = contentView.bounds.origin
+        contentView.scroll(to: NSPoint(x: min(max(0, origin.x), max(0, size.width - viewport.width)),
+                                       y: min(max(0, origin.y), max(0, size.height - viewport.height))))
+        reflectScrolledClipView(contentView)
     }
 }
 
@@ -110,7 +126,8 @@ struct SourcePane: NSViewRepresentable {
     }
     func makeEditor(coordinator: Coordinator) -> NSScrollView {
         let scroll = document.sourceScrollView ?? EditorScrollView(frame: NSRect(x: 0, y: 0, width: 640, height: 480))
-        scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .legacy
+        scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true; scroll.autohidesScrollers = false
         let text = document.sourceTextView ?? MarkdownTextView(frame: NSRect(origin: .zero, size: scroll.contentSize))
         text.isRichText = false; text.isEditable = true; text.isSelectable = true; text.allowsUndo = true
         text.isFieldEditor = false; text.importsGraphics = false
@@ -120,15 +137,16 @@ struct SourcePane: NSViewRepresentable {
         text.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         text.textColor = .textColor; text.backgroundColor = .textBackgroundColor
         text.textContainerInset = NSSize(width: 16, height: 16)
-        text.minSize = NSSize(width: 0, height: scroll.contentSize.height); text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        text.isVerticallyResizable = true; text.isHorizontallyResizable = false
-        text.autoresizingMask = [.width]; text.textContainer?.widthTracksTextView = true
-        text.textContainer?.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        text.minSize = NSSize(width: EditorPaneLayout.rawMinimum, height: scroll.contentSize.height); text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        text.isVerticallyResizable = true; text.isHorizontallyResizable = true
+        text.autoresizingMask = []; text.textContainer?.widthTracksTextView = false
+        text.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         if text.string != document.text { text.string = document.text }
         text.delegate = coordinator; text.commentAction = beginComment
         text.selectionFinished = { [weak coordinator] in coordinator?.showSelectionComment() }
         document.sourceTextView = text; document.sourceScrollView = scroll
         scroll.documentView = text; coordinator.text = text; coordinator.scroll = scroll
+        (scroll as? EditorScrollView)?.updateDocumentSize()
         scroll.contentView.postsBoundsChangedNotifications = true
         coordinator.observer = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak coordinator] _ in
             MainActor.assumeIsolated { coordinator?.scrolled() }
@@ -150,6 +168,7 @@ struct SourcePane: NSViewRepresentable {
             let selection = text.selectedRange(); text.string = document.text
             text.setSelectedRange(NSRange(location: min(selection.location, (document.text as NSString).length), length: 0))
         }
+        (scroll as? EditorScrollView)?.updateDocumentSize()
         if let jump = document.jump, c.lastJump != jump.id {
             c.lastJump = jump.id
             let length = (text.string as NSString).length
@@ -179,7 +198,10 @@ struct SourcePane: NSViewRepresentable {
         var lastScroll = -1.0
         init(_ parent: SourcePane) { self.parent = parent }
         deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
-        func textDidChange(_ notification: Notification) { if let text { parent.document.changed(text.string) } }
+        func textDidChange(_ notification: Notification) {
+            if let text { parent.document.changed(text.string) }
+            (scroll as? EditorScrollView)?.updateDocumentSize()
+        }
         func undoManager(for view: NSTextView) -> UndoManager? { parent.document.undoManager }
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let text else { return }
@@ -215,7 +237,7 @@ struct SourcePane: NSViewRepresentable {
             restoring = true
             text.layoutManager?.ensureLayout(for: text.textContainer!)
             let fraction = parent.document.layout.sourceScroll
-            scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, text.bounds.height - scroll.contentView.bounds.height) * fraction))
+            scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: max(0, text.bounds.height - scroll.contentView.bounds.height) * fraction))
             scroll.reflectScrolledClipView(scroll.contentView); lastScroll = fraction
             restoring = false
         }

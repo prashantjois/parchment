@@ -122,7 +122,10 @@
   .markdown-doc .token.function { color: var(--pt-syntax-function); }
   .markdown-doc .token.type { color: var(--pt-syntax-type); }
   .markdown-doc .table-scroll { overflow-x: auto; }
-  .markdown-doc table { width: 100%; border-collapse: collapse; }
+  .markdown-doc table { width: 100%; border-collapse: collapse; overflow-wrap: normal; }
+  .markdown-doc :is(pre, .table-scroll)::-webkit-scrollbar { height: 12px; }
+  .markdown-doc :is(pre, .table-scroll)::-webkit-scrollbar-track { background: var(--pt-surface); }
+  .markdown-doc :is(pre, .table-scroll)::-webkit-scrollbar-thumb { background: var(--pt-muted); border: 3px solid var(--pt-surface); border-radius: 6px; }
   .markdown-doc :is(th, td) { padding: 0.6em 0.8em; border: 1px solid var(--pt-border); text-align: start; }
   .markdown-doc th { background: var(--pt-surface); color: var(--pt-heading); font-weight: 700; }
   .markdown-doc tbody tr:nth-child(even) { background: var(--pt-surface); }

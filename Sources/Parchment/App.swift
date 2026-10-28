@@ -266,23 +266,24 @@ struct DocumentWorkspace: View {
         GeometryReader { geometry in
             let layout = EditorPaneLayout(viewportWidth: geometry.size.width, mode: document.layout.mode,
                                           splitFraction: document.layout.splitFraction)
-            EditorViewport(contentWidth: layout.width) {
-                HStack(spacing: 0) {
-                    if document.layout.mode != .rendered {
-                        SourcePane(document: document, beginComment: workspace.beginComment).frame(width: layout.rawWidth)
-                    }
-                    if document.layout.mode == .split {
-                        ResizeHandle(value: Binding(get: { Double(layout.rawWidth / layout.paneWidth) },
-                                                    set: { document.layout.splitFraction = $0 }),
-                                     limits: layout.splitLimits, scale: layout.paneWidth)
-                            .allowsHitTesting(layout.splitLimits.upperBound - layout.splitLimits.lowerBound > 0.0001)
-                    }
-                    if document.layout.mode != .raw {
+            HStack(spacing: 0) {
+                if document.layout.mode != .rendered {
+                    SourcePane(document: document, beginComment: workspace.beginComment).frame(width: layout.rawWidth)
+                }
+                if document.layout.mode == .split {
+                    ResizeHandle(value: Binding(get: { Double(layout.rawWidth / layout.paneWidth) },
+                                                set: { document.layout.splitFraction = $0 }),
+                                 limits: layout.splitLimits, scale: layout.paneWidth)
+                        .allowsHitTesting(layout.splitLimits.upperBound - layout.splitLimits.lowerBound > 0.0001)
+                }
+                if document.layout.mode != .raw {
+                    let contentWidth = max(EditorPaneLayout.renderedMinimum, layout.renderedWidth)
+                    EditorViewport(contentWidth: contentWidth) {
                         RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL,
-                                     beginComment: workspace.beginComment).frame(width: layout.renderedWidth)
-                    }
-                }.frame(width: layout.width).frame(maxHeight: .infinity)
-            }
+                                     beginComment: workspace.beginComment).frame(width: contentWidth).frame(maxHeight: .infinity)
+                    }.frame(width: layout.renderedWidth)
+                }
+            }.frame(width: layout.width).frame(maxHeight: .infinity)
         }
     }
     func toolbarButton(_ title: String, icon: String, shortcut: String, active: Bool, action: @escaping () -> Void) -> some View {

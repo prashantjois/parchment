@@ -16,69 +16,76 @@ import ParchmentCore
             if !condition { failures += 1 }
         }
         var valid = true
-        for width: CGFloat in [180, 620, 1240, 1328, 1800, 2400] {
+        for width: CGFloat in [180, 620, 1240, 1800, 2400] {
             for fraction in [0.0, 0.2, 0.5, 0.8, 1.0] {
                 let layout = EditorPaneLayout(viewportWidth: width, mode: .split, splitFraction: fraction)
-                valid = valid && layout.rawWidth >= 600 && layout.renderedWidth >= 720 &&
-                    layout.width >= width && abs(layout.rawWidth + layout.renderedWidth + 8 - layout.width) < 0.001
+                valid = valid && layout.rawWidth > 0 && layout.renderedWidth > 0 &&
+                    abs(layout.width - width) < 0.001 && abs(layout.rawWidth + layout.renderedWidth + 8 - width) < 0.001
             }
         }
-        expect(valid, "both split panes retain their minimum widths across narrow windows and extreme divider ratios")
-        expect(EditorPaneLayout(viewportWidth: 180, mode: .raw, splitFraction: 0.5).width == 600 &&
-               EditorPaneLayout(viewportWidth: 180, mode: .rendered, splitFraction: 0.5).width == 720,
-               "single-pane Raw and Rendered modes each retain their own minimum width")
-
+        expect(valid, "split view keeps both pane viewports inside the window across divider ratios")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("parchment-pane-check-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let workspace = Workspace(recoveryDirectory: directory)
         let document = workspace.active!
-        document.changed("# Layout\n\n```swift\nlet text = \"" + String(repeating: "wide ", count: 80) + "\"\n```\n")
+        let longWord = String(repeating: "UnbrokenColumnValue", count: 12)
+        document.changed("# Layout\n\n```swift\nlet text = \"" + String(repeating: "wide ", count: 80) +
+                         "\"\n```\n\n| First | Second |\n| --- | --- |\n| " + longWord + " | " + longWord + " |\n")
         try? await Task.sleep(for: .milliseconds(250))
         document.layout.mode = .split; document.layout.showFiles = false; document.layout.showRight = false
         let host = NSHostingView(rootView: WorkspaceView(workspace: workspace))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1240, height: 560),
-                              styleMask: .borderless, backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false; window.contentView = host
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil)
         defer { window.contentView = nil; window.close() }
         func settle() async {
-            for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try? await Task.sleep(for: .milliseconds(30)) }
+            for _ in 0..<10 { host.layoutSubtreeIfNeeded(); try? await Task.sleep(for: .milliseconds(30)) }
         }
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        func renderedViewport() -> EditorViewportScrollView? { descendants(host).compactMap { $0 as? EditorViewportScrollView }.first }
+        func visibleBar(_ scroll: NSScrollView) -> Bool {
+            guard let bar = scroll.horizontalScroller, !bar.isHiddenOrHasHiddenAncestor,
+                  bar.alphaValue > 0.9, bar.frame.height > 10 else { return false }
+            let rect = bar.convert(bar.bounds, to: host), visible = rect.intersection(host.visibleRect)
+            let point = bar.convert(NSPoint(x: bar.bounds.midX, y: bar.bounds.midY), to: host.superview)
+            let hit = host.hitTest(point)
+            return visible.width >= rect.width - 1 && visible.height >= rect.height - 1 &&
+                (hit === bar || hit?.isDescendant(of: bar) == true)
+        }
         await settle()
-        guard let viewport = descendants(host).compactMap({ $0 as? EditorViewportScrollView }).first,
-              let source = document.sourceScrollView,
-              let rendered = descendants(host).compactMap({ $0 as? PreviewWebView }).first else {
+        guard let viewport = renderedViewport(), let source = document.sourceScrollView as? EditorScrollView,
+              let text = document.sourceTextView,
+              let rendered = descendants(viewport).compactMap({ $0 as? PreviewWebView }).first else {
             print("FAIL editor panes did not mount"); return 1
         }
-        expect(source.frame.width >= 600 && rendered.frame.width >= 720 &&
-               viewport.documentView!.frame.width > viewport.contentSize.width,
-               "real Raw and WebKit panes stay readable in a narrow editor with horizontal overflow")
-        expect(viewport.horizontalScroller?.isHidden == false && (viewport.horizontalScroller?.knobProportion ?? 1) < 1,
-               "the initial narrow layout has a usable horizontal scrollbar before any scroll event")
-        expect(viewport.scrollerStyle == .legacy && !viewport.horizontalScroller!.isHidden,
-               "overflow keeps a persistent scrollbar even when macOS normally uses overlay scrollbars")
-        viewport.contentView.scroll(to: NSPoint(x: 20, y: 0))
-        viewport.reflectScrolledClipView(viewport.contentView)
-        expect(viewport.contentView.bounds.origin.x > 0, "the editor viewport can scroll sideways")
-
+        expect(visibleBar(source) && visibleBar(viewport),
+               "Raw and Rendered each have an on-screen horizontal scrollbar that receives pointer events")
+        let rawBar = source.horizontalScroller!.convert(source.horizontalScroller!.bounds, to: host)
+        let renderedBar = viewport.horizontalScroller!.convert(viewport.horizontalScroller!.bounds, to: host)
+        expect(rawBar.maxX < renderedBar.minX && abs(rawBar.minY - renderedBar.minY) < 1,
+               "the independent scrollbars sit side by side at the bottom of their panes")
+        expect(text.frame.width > source.contentSize.width && text.frame.width >= 600 && rendered.frame.width >= 720,
+               "long Raw lines and the Rendered minimum width create real horizontal overflow")
+        let longLine = (text.string as NSString).range(of: "let text = \"" + String(repeating: "wide ", count: 80) + "\"")
+        let glyphs = text.layoutManager!.glyphRange(forCharacterRange: longLine, actualCharacterRange: nil)
+        var fragments = 0
+        text.layoutManager!.enumerateLineFragments(forGlyphRange: glyphs) { _, _, _, _, _ in fragments += 1 }
+        expect(fragments == 1, "Raw keeps a long source line on one line instead of wrapping it to hide overflow")
         let wheel = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: -40, wheel3: 0)!
         wheel.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
-        let before = viewport.contentView.bounds.origin.x
-        source.documentView!.scrollWheel(with: NSEvent(cgEvent: wheel)!)
+        text.scrollWheel(with: NSEvent(cgEvent: wheel)!)
         await settle()
-        expect(viewport.contentView.bounds.origin.x != before, "horizontal trackpad events over Raw scroll the outer viewport")
-
+        expect(source.contentView.bounds.origin.x > 0 && viewport.contentView.bounds.origin.x == 0,
+               "wheel events over Raw scroll Raw without moving Rendered")
         func javascript(_ script: String) async -> Any? {
             await withCheckedContinuation { continuation in
                 rendered.evaluateJavaScript(script) { result, _ in continuation.resume(returning: result) }
             }
         }
         for _ in 0..<20 {
-            if await javascript("typeof canScrollHorizontallyAtPoint === 'function'") as? Bool == true { break }
+            if await javascript("window.parchmentOuterHorizontalScrolling === true") as? Bool == true { break }
             try? await Task.sleep(for: .milliseconds(50))
         }
-        expect((await javascript("innerWidth") as? Double ?? 0) >= 720,
-               "the actual WebKit document retains the Rendered minimum width")
         func webWheel(_ properties: String, selector: String = "h1") async -> Any? {
             await javascript("""
             (() => {
@@ -88,94 +95,112 @@ import ParchmentCore
             })()
             """)
         }
-        viewport.scrollHorizontally(by: -10000)
+        let sourceX = source.contentView.bounds.origin.x
         let webHandled = await webWheel("deltaX:40")
         await settle()
-        expect(webHandled as? Bool == false && viewport.contentView.bounds.origin.x > 0,
-               "wheel events inside WebKit's page reach the outer viewport")
-        let verticalBefore = viewport.contentView.bounds.origin.x
+        expect(webHandled as? Bool == false && viewport.contentView.bounds.origin.x > 0 && source.contentView.bounds.origin.x == sourceX,
+               "wheel events inside WebKit scroll Rendered without moving Raw")
+        let renderedX = viewport.contentView.bounds.origin.x
         let verticalHandled = await webWheel("deltaY:40")
         await settle()
-        expect(verticalHandled as? Bool == true && viewport.contentView.bounds.origin.x == verticalBefore,
-               "ordinary vertical wheel events stay inside the page")
+        expect(verticalHandled as? Bool == true && viewport.contentView.bounds.origin.x == renderedX,
+               "vertical page scrolling preserves the horizontal offset")
         let shifted = await webWheel("deltaY:40, shiftKey:true")
         await settle()
-        expect(shifted as? Bool == false && viewport.contentView.bounds.origin.x > verticalBefore,
-               "Shift-wheel events inside WebKit scroll the outer viewport")
-        let ownsScroll = await javascript("""
+        expect(shifted as? Bool == false && viewport.contentView.bounds.origin.x > renderedX,
+               "Shift-wheel events inside WebKit move the Rendered viewport")
+        expect((await javascript("document.querySelector('.table-scroll').scrollWidth > document.querySelector('.table-scroll').clientWidth") as? Bool) == true,
+               "wide tables overflow instead of breaking column values to fit")
+        let tableChrome = await javascript("""
         (() => {
-          const pre = document.querySelector('pre');
-          pre.style.width = '100px';
-          const rect = pre.getBoundingClientRect(), x = rect.left + 20, y = rect.top + 20;
-          pre.scrollLeft = 0;
-          const right = canScrollHorizontallyAtPoint(x, y, 40), left = canScrollHorizontallyAtPoint(x, y, -40);
-          pre.scrollLeft = pre.scrollWidth;
-          const endRight = canScrollHorizontallyAtPoint(x, y, 40), endLeft = canScrollHorizontallyAtPoint(x, y, -40);
-          pre.scrollLeft = 0; pre.style.width = '';
-          return right && !left && !endRight && endLeft;
+          const table = document.querySelector('.table-scroll');
+          return getComputedStyle(table, '::-webkit-scrollbar').height === '12px' &&
+                 getComputedStyle(table, '::-webkit-scrollbar-thumb').backgroundColor !== 'rgba(0, 0, 0, 0)';
         })()
         """)
-        expect(ownsScroll as? Bool == true, "Rendered code blocks keep their own horizontal scrolling and hand off at their edges")
-        viewport.scrollHorizontally(by: -10000)
-        let innerHandled = await webWheel("deltaX:40", selector: "pre")
+        expect(tableChrome as? Bool == true, "overflowing Rendered blocks have an explicit visible scrollbar track and thumb")
+        for selector in ["pre", ".table-scroll"] {
+            viewport.scrollHorizontally(by: -10000)
+            _ = await javascript("document.querySelector('\(selector)').scrollLeft = 0")
+            let inner = await webWheel("deltaX:40", selector: selector)
+            await settle()
+            expect(inner as? Bool == true && viewport.contentView.bounds.origin.x == 0,
+                   "\(selector) keeps its own horizontal wheel events before its edge")
+            _ = await javascript("document.querySelector('\(selector)').scrollLeft = 100000")
+            let edge = await webWheel("deltaX:40", selector: selector)
+            await settle()
+            expect(edge as? Bool == false && viewport.contentView.bounds.origin.x > 0,
+                   "\(selector) hands wheel events to Rendered at its edge")
+        }
+        func dragKnob(_ scroll: NSScrollView) -> Bool {
+            guard let bar = scroll.horizontalScroller, bar.isEnabled else { return false }
+            let knob = bar.rect(for: .knob)
+            let start = bar.convert(NSPoint(x: knob.midX, y: knob.midY), to: nil)
+            let end = NSPoint(x: start.x + 25, y: start.y)
+            func event(_ type: NSEvent.EventType, _ point: NSPoint) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            let before = scroll.contentView.bounds.origin.x
+            NSApp.postEvent(event(.leftMouseDragged, end), atStart: false)
+            NSApp.postEvent(event(.leftMouseUp, end), atStart: false)
+            bar.mouseDown(with: event(.leftMouseDown, start))
+            return scroll.contentView.bounds.origin.x != before
+        }
+        expect(dragKnob(source), "dragging the Raw scrollbar thumb moves the actual text viewport")
+        expect(dragKnob(viewport), "dragging the Rendered scrollbar thumb moves the actual preview viewport")
+        let horizontalBeforeSync = source.contentView.bounds.origin.x
+        document.changed(document.text + String(repeating: "\nShort line", count: 80))
         await settle()
-        expect(innerHandled as? Bool == true && viewport.contentView.bounds.origin.x == 0,
-               "the page wheel listener leaves code-block scrolling inside the code block")
-        _ = await javascript("document.querySelector('pre').scrollLeft = 100000")
-        let edgeHandled = await webWheel("deltaX:40", selector: "pre")
+        document.layout.sourceScroll = 0.5
+        document.layout.renderedScroll = 0.5
         await settle()
-        expect(edgeHandled as? Bool == false && viewport.contentView.bounds.origin.x > 0,
-               "the page wheel listener hands off to the viewport at a code-block edge")
-        viewport.contentView.scroll(to: NSPoint(x: 20, y: 0))
-        let renderedBefore = viewport.contentView.bounds.origin.x
-        rendered.scrollWheel(with: NSEvent(cgEvent: wheel)!)
-        await settle()
-        expect(viewport.contentView.bounds.origin.x != renderedBefore, "horizontal wheel events over Rendered can scroll the outer viewport")
-
+        expect(source.contentView.bounds.origin.y > 0 && source.contentView.bounds.origin.x == horizontalBeforeSync,
+               "synchronized vertical scrolling does not reset Raw horizontal scrolling")
         document.layout.showFiles = true; document.layout.showRight = true
-        await settle()
-        expect(source.frame.width >= 600 && rendered.frame.width >= 720 && viewport.frame.width < 1240,
-               "opening sidebars reduces the viewport without squishing either pane")
-        for style: NSScroller.Style in [.legacy, .overlay] {
-            viewport.scrollerStyle = style; viewport.tile(); await settle()
-            expect(abs(viewport.documentView!.frame.height - viewport.contentSize.height) < 0.01,
-                   "\(style == .legacy ? "always-visible" : "overlay") horizontal scrollbar leaves the full editor height usable")
-        }
-        document.layout.showFiles = false; document.layout.showRight = false
-        window.setContentSize(NSSize(width: 1800, height: 500))
-        for _ in 0..<20 {
-            host.layoutSubtreeIfNeeded()
-            if abs(viewport.documentView!.frame.width - viewport.contentSize.width) < 0.01 &&
-                viewport.contentView.bounds.origin.x == 0 && source.frame.width >= 600 && rendered.frame.width >= 720 { break }
-            try? await Task.sleep(for: .milliseconds(25))
-        }
-        expect(abs(viewport.documentView!.frame.width - viewport.contentSize.width) < 0.01 &&
-               viewport.contentView.bounds.origin.x == 0 && source.frame.width >= 600 && rendered.frame.width >= 720,
-               "widening the window fills the available space and removes horizontal overflow")
-        let wideHandled = await webWheel("deltaX:40")
-        expect(wideHandled as? Bool == true,
-               "the page wheel listener releases horizontal events when there is no outer overflow")
-        viewport.scrollerStyle = .legacy
         window.setContentSize(NSSize(width: 900, height: 560))
-        document.layout.showFiles = true; document.layout.showRight = true
         await settle()
-        expect(viewport.hasHorizontalOverflow && source.frame.width >= 600 && rendered.frame.width >= 720,
-               "shrinking the full workspace with both sidebars preserves pane widths and creates overflow")
-        expect(viewport.horizontalScroller?.isHidden == false && (viewport.horizontalScroller?.frame.height ?? 0) > 0,
-               "overflow provides a visible horizontal scrollbar without a gesture")
+        expect(visibleBar(source) && visibleBar(viewport) && text.frame.width >= 600 && rendered.frame.width >= 720,
+               "both scrollbars stay visible and reachable when sidebars narrow the editor")
+        for fraction in [0.2, 0.8] {
+            document.layout.splitFraction = fraction
+            await settle()
+            expect(visibleBar(source) && visibleBar(viewport) && text.frame.width >= 600 && rendered.frame.width >= 720,
+                   "both controls stay inside their panes at split fraction \(fraction)")
+        }
         for mode: ViewMode in [.raw, .rendered, .split] {
             document.layout.mode = mode
             await settle()
-            guard let current = descendants(host).compactMap({ $0 as? EditorViewportScrollView }).first else {
-                expect(false, "viewport survives mode changes"); continue
-            }
-            let panes = descendants(current)
-            let raw = panes.compactMap { $0 as? EditorScrollView }.first
-            let preview = panes.compactMap { $0 as? PreviewWebView }.first
-            expect((mode == .rendered || (raw?.frame.width ?? 0) >= 600) &&
-                   (mode == .raw || (preview?.frame.width ?? 0) >= 720) &&
-                   current.hasHorizontalOverflow && current.horizontalScroller?.isHidden == false,
-                   "\(mode.rawValue) mode keeps minimum widths and a scrollbar after switching views")
+            expect((mode == .rendered || visibleBar(source)) && (mode == .raw || renderedViewport().map(visibleBar) == true),
+                   "\(mode.rawValue) mode retains the appropriate horizontal scrollbars")
+        }
+        document.layout.showFiles = false; document.layout.showRight = false; document.layout.mode = .raw
+        document.changed("# Short\n")
+        window.setContentSize(NSSize(width: 1800, height: 560))
+        await settle()
+        expect(visibleBar(source) && abs(text.frame.width - source.contentSize.width) < 1 && source.contentView.bounds.origin.x == 0,
+               "removing a long line shrinks Raw content and clears overflow while keeping the scrollbar visible")
+        document.undoManager.removeAllActions(); document.undoManager.groupsByEvent = false
+        document.undoManager.beginUndoGrouping()
+        text.insertText(String(repeating: "x", count: 400), replacementRange: NSRange(location: 0, length: 0))
+        document.undoManager.endUndoGrouping()
+        await settle()
+        expect(text.frame.width > source.contentSize.width && source.horizontalScroller?.isEnabled == true,
+               "a native insertion of a long line immediately enables Raw horizontal scrolling")
+        document.undoManager.undo()
+        await settle()
+        expect(text.string == "# Short\n" && abs(text.frame.width - source.contentSize.width) < 1,
+               "native undo removes the long-line overflow without leaving a stale canvas")
+        document.layout.mode = .rendered
+        await settle()
+        if let current = renderedViewport() {
+            expect(visibleBar(current) && !current.hasHorizontalOverflow && current.contentView.bounds.origin.x == 0,
+                   "a wide Rendered pane keeps its scrollbar visible even when the content fits")
+        } else { expect(false, "Rendered viewport remounts") }
+        if let path = ProcessInfo.processInfo.environment["PARCHMENT_PANE_SNAPSHOT"],
+           let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
         }
         print("Pane checks: \(failures) failures")
         return failures == 0 ? 0 : 1

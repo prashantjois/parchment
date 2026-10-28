@@ -10,7 +10,9 @@ Right-click a tab for **Add File Comment**, **Close Tab**, **Close Tabs Before**
 
 Raw mode provides native text editing, selection, cut/copy/paste, undo/redo, find and replace, spelling, formatting shortcuts, and automatic list continuation. Tab and Shift-Tab indent and outdent selected lines. `⌘⌥]` and `⌘⌥[` also change indentation. Rendered mode is a read-only preview. Split mode shows both views with proportional scroll synchronization. The preview updates about 180 milliseconds after a typing pause. Rendered content fills the pane width with 16-pixel side margins by default.
 
-Raw has a minimum width of 600 points. Rendered has a minimum width of 720 points. If the window or sidebars leave less space, the editor area scrolls horizontally. A horizontal scrollbar stays visible while the editor overflows, including with the macOS overlay scrollbar setting. Use the horizontal scrollbar, scroll sideways on a trackpad, or use Shift with the mouse wheel. Sidebars remain in place. The split divider stops at each pane's minimum width. Code blocks and tables retain their own horizontal scrolling.
+Raw and Rendered each have a horizontal scrollbar at the bottom of the pane. Both bars stay visible even when the content fits. Raw content has a minimum width of 600 points. Long Raw lines stay on one line and scroll sideways. Rendered content has a minimum width of 720 points.
+
+If the window or sidebars leave less space, scroll each pane independently. Drag the split divider to resize the visible panes. Sidebars remain in place. Use the horizontal scrollbar, scroll sideways on a trackpad, or use Shift with the mouse wheel. Code blocks and wide tables have their own horizontal scrollbars. Their wheel events move the Rendered pane after they reach an edge.
 
 The file browser starts in the current file's folder. An unsaved document starts in the user's home folder. The browser supports expandable folders and parent navigation.
 

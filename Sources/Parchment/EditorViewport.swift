@@ -15,18 +15,16 @@ struct EditorPaneLayout {
     init(viewportWidth: CGFloat, mode: ViewMode, splitFraction: Double) {
         switch mode {
         case .raw:
-            width = max(Self.rawMinimum, viewportWidth)
+            width = max(0, viewportWidth)
             rawWidth = width; renderedWidth = 0; splitLimits = 0...1
         case .rendered:
-            width = max(Self.renderedMinimum, viewportWidth)
+            width = max(0, viewportWidth)
             rawWidth = 0; renderedWidth = width; splitLimits = 0...1
         case .split:
-            let available = max(Self.rawMinimum + Self.renderedMinimum, viewportWidth - Self.dividerWidth)
-            let lower = max(0.2, Double(Self.rawMinimum / available))
-            let upper = max(lower, min(0.8, Double(1 - Self.renderedMinimum / available)))
-            splitLimits = lower...upper
-            let fraction = min(upper, max(lower, splitFraction))
-            rawWidth = min(available - Self.renderedMinimum, max(Self.rawMinimum, available * fraction))
+            let available = max(0, viewportWidth - Self.dividerWidth)
+            splitLimits = 0.2...0.8
+            let fraction = min(splitLimits.upperBound, max(splitLimits.lowerBound, splitFraction))
+            rawWidth = available * fraction
             renderedWidth = available - rawWidth
             width = available + Self.dividerWidth
         }
@@ -92,7 +90,7 @@ struct EditorViewport<Content: View>: NSViewRepresentable {
         // Keep the overflow control visible even with the system's overlay preference.
         scroll.scrollerStyle = .legacy
         scroll.hasHorizontalScroller = true; scroll.hasVerticalScroller = false
-        scroll.autohidesScrollers = true; scroll.drawsBackground = false
+        scroll.autohidesScrollers = false; scroll.drawsBackground = true
         scroll.borderType = .noBorder
         scroll.horizontalScrollElasticity = .none; scroll.verticalScrollElasticity = .none
         let host = NSHostingView(rootView: content)
