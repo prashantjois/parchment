@@ -2,7 +2,7 @@
 
 Each file opens in a tab. An already open file activates its existing tab. Each file remembers its view mode, sidebar widths, split divider, cursor, and scroll position.
 
-Hover over an enabled button to see its highlight. Pause over a button to see a tooltip with its action and available shortcut. This feedback covers toolbar buttons, tab icons, sidebar actions, comments, reviews, and theme controls. Disabled buttons remain unhighlighted.
+Hover over an enabled button to see its highlight immediately. Pause for about 0.3 seconds to see a tooltip with its action and available shortcut. This feedback covers toolbar buttons, tab icons, sidebar actions, comments, reviews, and theme controls. Disabled buttons remain unhighlighted.
 
 Drag a tab to reorder it. The insertion marker shows the drop position before or after another tab. Tab order survives a restart. Reordering preserves the active tab and unsaved edits.
 

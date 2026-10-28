@@ -23,6 +23,8 @@ import ParchmentCore
                 FileHandle.standardOutput.write(data); FileHandle.standardOutput.write(Data("\n".utf8)); exit(0)
             } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
         }
+        // AppKit uses milliseconds; keep the shorter tooltip delay scoped to Parchment.
+        UserDefaults.standard.set(300, forKey: "NSInitialToolTipDelay")
         let server = AppInstance.claimOrForward()
         let state = Workspace(); _workspace = StateObject(wrappedValue: state); AppDelegate.workspace = state
         guard state.startIntegration(server: server) else {

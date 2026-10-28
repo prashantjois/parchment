@@ -43,6 +43,9 @@ final class ButtonFeedbackView: NSView {
         updateHighlight()
     }
     private func updateHighlight() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
         effectiveAppearance.performAsCurrentDrawingAppearance {
             let visible = enabled && hovered
             let contrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
