@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.22 | 23 | 2026-10-27 | Current release | Added minimum pane widths and horizontal editor scrolling to prevent compressed content. |
+| 0.1.23 | 24 | 2026-10-27 | Current release | Increased pane minimum widths, kept the horizontal scrollbar visible during overflow, and forwarded page-level WebKit wheel events. |
+| 0.1.22 | 23 | 2026-10-27 | `c56d8ab` | Added minimum pane widths and horizontal editor scrolling to prevent compressed content. |
 | 0.1.21 | 22 | 2026-10-27 | `7b8f8b8` | Shortened tooltips to a 300 ms delay and removed hover highlight animation. |
 | 0.1.20 | 21 | 2026-10-27 | `aafbd4c` | Added consistent hover highlights and action tooltips to app buttons. |
 | 0.1.19 | 20 | 2026-10-27 | `0623819` | Added Add File Comment to the tab context menu. |
@@ -27,6 +28,13 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.23
+
+- Increased the Raw minimum width to 600 points and the Rendered minimum width to 720 points. Split content requires 1328 points.
+- The horizontal scrollbar stays visible during overflow, including with the macOS overlay scrollbar setting.
+- Wheel events inside the rendered page reach the editor viewport. Code blocks retain their own scrolling until their edges.
+- Expanded checks cover the full workspace, page-level wheel events, sidebar changes, window resizing, and view-mode switches.
 
 ## 0.1.22
 

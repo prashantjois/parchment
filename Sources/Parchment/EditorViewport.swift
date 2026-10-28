@@ -3,8 +3,8 @@ import SwiftUI
 import ParchmentCore
 
 struct EditorPaneLayout {
-    static let rawMinimum: CGFloat = 400
-    static let renderedMinimum: CGFloat = 480
+    static let rawMinimum: CGFloat = 600
+    static let renderedMinimum: CGFloat = 720
     static let dividerWidth: CGFloat = 8
     let width: CGFloat
     let rawWidth: CGFloat
@@ -65,6 +65,12 @@ final class EditorViewportScrollView: NSScrollView {
         guard let documentView else { return }
         let size = NSSize(width: max(minimumContentWidth, contentSize.width), height: max(0, contentSize.height))
         if documentView.frame.size != size { documentView.setFrameSize(size) }
+        reflectScrolledClipView(contentView)
+        func updatePreview(_ view: NSView) {
+            if let web = view as? PreviewWebView { web.updateHorizontalScrolling(); return }
+            view.subviews.forEach(updatePreview)
+        }
+        updatePreview(documentView)
         let x = min(max(0, contentView.bounds.origin.x), max(0, size.width - contentSize.width))
         if contentView.bounds.origin != NSPoint(x: x, y: 0) {
             contentView.scroll(to: NSPoint(x: x, y: 0))
@@ -83,6 +89,8 @@ struct EditorViewport<Content: View>: NSViewRepresentable {
     }
     func makeNSView(context: Context) -> EditorViewportScrollView {
         let scroll = EditorViewportScrollView()
+        // Keep the overflow control visible even with the system's overlay preference.
+        scroll.scrollerStyle = .legacy
         scroll.hasHorizontalScroller = true; scroll.hasVerticalScroller = false
         scroll.autohidesScrollers = true; scroll.drawsBackground = false
         scroll.borderType = .noBorder

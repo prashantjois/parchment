@@ -8,7 +8,14 @@ final class PreviewWebView: WKWebView, NSMenuItemValidation {
     var hasCommentSelection = false
     var remoteImageAction: ((String, Bool) -> Void)?
     private var remoteImageSource = ""
+    private var outerHorizontalOverflow: Bool?
     let selectionPopover = SelectionCommentPopover()
+    func updateHorizontalScrolling(force: Bool = false) {
+        let overflow = EditorViewportScrollView.containing(self)?.hasHorizontalOverflow == true
+        guard force || outerHorizontalOverflow != overflow else { return }
+        outerHorizontalOverflow = overflow
+        evaluateJavaScript("window.parchmentOuterHorizontalScrolling = \(overflow)", completionHandler: nil)
+    }
     override func scrollWheel(with event: NSEvent) {
         guard let viewport = EditorViewportScrollView.containing(self), viewport.hasHorizontalOverflow,
               let delta = EditorViewportScrollView.horizontalDelta(for: event) else {
@@ -122,6 +129,7 @@ struct RenderedPane: NSViewRepresentable {
         init(_ parent: RenderedPane) { self.parent = parent }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             ready = true; lastScroll = -1; lastHighlights = ""; lastImagePolicy = ""; updateState()
+            web?.updateHorizontalScrolling(force: true)
         }
         func updateState() {
             guard let web else { return }
@@ -175,6 +183,11 @@ struct RenderedPane: NSViewRepresentable {
                 lastScroll = fraction; doc.layout.renderedScroll = fraction
                 if doc.layout.mode == .split { doc.layout.sourceScroll = fraction }
                 doc.onChange?()
+            } else if type == "horizontal-scroll", let delta = value["delta"] as? Double,
+                      delta.isFinite, let web,
+                      let viewport = EditorViewportScrollView.containing(web), viewport.hasHorizontalOverflow {
+                web.selectionPopover.hide()
+                viewport.scrollHorizontally(by: delta)
             } else if type == "remote-image-menu", let source = value["source"] as? String,
                       let x = value["x"] as? Double, let y = value["y"] as? Double, let web {
                 web.selectionPopover.hide()
@@ -217,6 +230,18 @@ struct RenderedPane: NSViewRepresentable {
       }
       return false;
     }
+    // WKWebView's internal content view can consume wheel events before AppKit's override.
+    document.addEventListener('wheel', event => {
+      if (!window.parchmentOuterHorizontalScrolling) return;
+      let delta;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) delta = event.deltaX;
+      else if (event.shiftKey) delta = event.deltaY;
+      else return;
+      if (!delta || canScrollHorizontallyAtPoint(event.clientX, event.clientY, delta)) return;
+      event.preventDefault();
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerWidth : 1;
+      send({type:'horizontal-scroll', delta:delta * scale});
+    }, {passive:false});
     function setRemoteImages(policy) {
       const allowed = new Set(policy.sources);
       for (const element of document.querySelectorAll('[data-remote-src]')) {
