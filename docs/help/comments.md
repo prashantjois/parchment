@@ -2,7 +2,7 @@
 
 Select text in Raw or Rendered mode to see a small floating **Comment** button. You can also right-click the selection or press `Control-M`. The floating button preserves the selection and leaves keyboard focus in the editor.
 
-To comment on an entire file, click its tab's comment icon, hover over the tab name for the floating Comment prompt, or press `Control-Shift-M`. File comments work without a selection, including in empty files. They remain attached to the file after text changes and support the same replies, reviews, and resolution actions.
+To comment on an entire file, right-click its tab and choose **Add File Comment**. You can also click the tab's comment icon, hover over its name for the floating Comment prompt, or press `Control-Shift-M`. File comments work without a selection, including in empty files. They remain attached to the file after text changes and support the same replies, reviews, and resolution actions.
 
 The composer offers **Comment Now** for immediate publication and **Start a Review** for a pending comment. During a review, **Add to Review** adds further pending comments. **Comment Now** remains available for individual comments that need immediate publication.
 

@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.18 | 19 | 2026-10-27 | Current release | Document links select Rendered mode; terminal-link guidance now describes client limitations. |
+| 0.1.19 | 20 | 2026-10-27 | Current release | Added Add File Comment to the tab context menu. |
+| 0.1.18 | 19 | 2026-10-27 | `0b10bb2` | Document links select Rendered mode; terminal-link guidance now describes client limitations. |
 | 0.1.17 | 18 | 2026-10-27 | `856d94b` | The install script requests a normal quit from running Parchment apps before installation. |
 | 0.1.16 | 17 | 2026-10-27 | `46d7d0c` | Install scripts in a checkout prefer its matching local build and never select an older release silently. |
 | 0.1.15 | 16 | 2026-10-27 | `84483f9` | Added tab reordering and context-menu actions to close groups of tabs. |
@@ -23,6 +24,12 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.19
+
+- Added Add File Comment to each tab's right-click menu.
+- The action opens the existing file-comment composer for the clicked tab, including background and empty tabs.
+- Updated the Editing and Comments guides with the new menu action.
 
 ## 0.1.18
 

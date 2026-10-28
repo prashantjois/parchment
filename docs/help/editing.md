@@ -4,7 +4,7 @@ Each file opens in a tab. An already open file activates its existing tab. Each 
 
 Drag a tab to reorder it. The insertion marker shows the drop position before or after another tab. Tab order survives a restart. Reordering preserves the active tab and unsaved edits.
 
-Right-click a tab for **Close Tab**, **Close Tabs Before**, **Close Tabs After**, or **Close All Tabs**. Before and After refer to the clicked tab in the current tab order. These actions preserve the existing save prompts. If you cancel a prompt or a save fails, bulk closing stops. Tabs already closed remain closed.
+Right-click a tab for **Add File Comment**, **Close Tab**, **Close Tabs Before**, **Close Tabs After**, or **Close All Tabs**. Add File Comment opens the composer for the clicked tab, even when another tab is active. Before and After refer to the clicked tab in the current tab order. These actions preserve the existing save prompts. If you cancel a prompt or a save fails, bulk closing stops. Tabs already closed remain closed.
 
 Raw mode provides native text editing, selection, cut/copy/paste, undo/redo, find and replace, spelling, formatting shortcuts, and automatic list continuation. Tab and Shift-Tab indent and outdent selected lines. `⌘⌥]` and `⌘⌥[` also change indentation. Rendered mode is a read-only preview. Split mode shows both views with proportional scroll synchronization. The preview updates about 180 milliseconds after a typing pause. Rendered content fills the pane width with 16-pixel side margins by default.
 

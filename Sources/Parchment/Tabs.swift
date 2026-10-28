@@ -83,6 +83,8 @@ struct DocumentTab: View {
             .onDrop(of: [DocumentTabDrag.type], delegate: DocumentTabDrop(workspace: workspace, target: document.id,
                                                                        width: width, edge: $dropEdge))
             .contextMenu {
+                Button("Add File Comment", action: comment)
+                Divider()
                 Button("Close Tab") { workspace.close(document) }
                 Button("Close Tabs Before") { workspace.closeTabs(.before, relativeTo: document.id) }
                     .disabled(workspace.tabsToClose(.before, relativeTo: document.id).isEmpty)
