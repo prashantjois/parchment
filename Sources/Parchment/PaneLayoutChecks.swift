@@ -60,6 +60,19 @@ import ParchmentCore
         }
         expect(visibleBar(source) && visibleBar(viewport),
                "Raw and Rendered each have an on-screen horizontal scrollbar that receives pointer events")
+        let beforeComposition = document.text
+        text.setSelectedRange(NSRange(location: 0, length: 0))
+        text.setMarkedText("入力", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: 0, length: 0))
+        document.saveMessage = "Composition refresh check"
+        await settle()
+        expect(text.hasMarkedText() && text.string.hasPrefix("入力") && document.text == beforeComposition,
+               "a SwiftUI refresh preserves marked text without publishing an unfinished input composition")
+        text.insertText("Committed ", replacementRange: text.markedRange())
+        await settle()
+        expect(!text.hasMarkedText() && document.text == text.string && document.text.hasPrefix("Committed "),
+               "committing composed text updates the document without replacing native input")
+        document.changed(beforeComposition)
+        await settle()
         let rawBar = source.horizontalScroller!.convert(source.horizontalScroller!.bounds, to: host)
         let renderedBar = viewport.horizontalScroller!.convert(viewport.horizontalScroller!.bounds, to: host)
         expect(rawBar.maxX < renderedBar.minX && abs(rawBar.minY - renderedBar.minY) < 1,
@@ -157,6 +170,27 @@ import ParchmentCore
         await settle()
         expect(source.contentView.bounds.origin.y > 0 && source.contentView.bounds.origin.x == horizontalBeforeSync,
                "synchronized vertical scrolling does not reset Raw horizontal scrolling")
+        let sourceFrame = source.convert(source.bounds, to: host)
+        let previewFrame = viewport.convert(viewport.bounds, to: host)
+        let beforeTyping = document.text
+        let insertion = text.characterIndexForInsertion(at: NSPoint(x: source.contentView.bounds.minX + 30,
+                                                                    y: source.contentView.bounds.minY + 80))
+        text.setSelectedRange(NSRange(location: insertion, length: 0))
+        var stableEditing = true
+        for _ in 0..<12 {
+            let location = text.selectedRange().location
+            text.insertText("a", replacementRange: text.selectedRange())
+            await settle()
+            stableEditing = stableEditing && text.string == document.text &&
+                text.selectedRange().location == location + 1 &&
+                source.convert(source.bounds, to: host) == sourceFrame &&
+                viewport.convert(viewport.bounds, to: host) == previewFrame &&
+                renderedViewport() === viewport &&
+                document.layout.sourceScroll > 0.1 && document.layout.renderedScroll > 0.1
+        }
+        expect(stableEditing, "repeated native typing and preview refresh preserve text, selection, pane frames, and scroll position")
+        document.changed(beforeTyping)
+        await settle()
         document.layout.showFiles = true; document.layout.showRight = true
         window.setContentSize(NSSize(width: 900, height: 560))
         await settle()

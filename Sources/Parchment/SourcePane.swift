@@ -5,7 +5,12 @@ import ParchmentCore
 final class MarkdownTextView: NSTextView {
     var commentAction: (() -> Void)?
     var selectionFinished: (() -> Void)?
+    var compositionEnded: (() -> Void)?
     let selectionPopover = SelectionCommentPopover()
+    override func unmarkText() {
+        super.unmarkText()
+        DispatchQueue.main.async { [weak self] in self?.compositionEnded?() }
+    }
     override func mouseDown(with event: NSEvent) {
         selectionPopover.hide()
         super.mouseDown(with: event)
@@ -86,6 +91,7 @@ final class MarkdownTextView: NSTextView {
 
 final class EditorScrollView: NSScrollView {
     private var updatingDocumentSize = false
+    private var sizeUpdatePending = false
     override func scrollWheel(with event: NSEvent) {
         if let delta = EditorViewportScrollView.horizontalDelta(for: event) {
             let maximum = max(0, (documentView?.frame.width ?? 0) - contentSize.width)
@@ -99,7 +105,18 @@ final class EditorScrollView: NSScrollView {
         updateDocumentSize()
     }
     func updateDocumentSize() {
+        // TextKit can still be processing edits inside tile/textDidChange.
+        guard !sizeUpdatePending, !updatingDocumentSize else { return }
+        sizeUpdatePending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.sizeUpdatePending = false
+            self.measureDocumentSize()
+        }
+    }
+    private func measureDocumentSize() {
         guard !updatingDocumentSize, let text = documentView as? NSTextView,
+              !text.hasMarkedText(),
               let container = text.textContainer, let manager = text.layoutManager else { return }
         updatingDocumentSize = true
         defer { updatingDocumentSize = false }
@@ -141,9 +158,10 @@ struct SourcePane: NSViewRepresentable {
         text.isVerticallyResizable = true; text.isHorizontallyResizable = true
         text.autoresizingMask = []; text.textContainer?.widthTracksTextView = false
         text.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        if text.string != document.text { text.string = document.text }
+        if text.string != document.text && !text.hasMarkedText() { text.string = document.text }
         text.delegate = coordinator; text.commentAction = beginComment
         text.selectionFinished = { [weak coordinator] in coordinator?.showSelectionComment() }
+        text.compositionEnded = { [weak coordinator] in coordinator?.nativeTextChanged() }
         document.sourceTextView = text; document.sourceScrollView = scroll
         scroll.documentView = text; coordinator.text = text; coordinator.scroll = scroll
         (scroll as? EditorScrollView)?.updateDocumentSize()
@@ -162,28 +180,8 @@ struct SourcePane: NSViewRepresentable {
         return scroll
     }
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        let c = context.coordinator; c.parent = self
-        guard let text = c.text else { return }
-        if text.string != document.text {
-            let selection = text.selectedRange(); text.string = document.text
-            text.setSelectedRange(NSRange(location: min(selection.location, (document.text as NSString).length), length: 0))
-        }
-        (scroll as? EditorScrollView)?.updateDocumentSize()
-        if let jump = document.jump, c.lastJump != jump.id {
-            c.lastJump = jump.id
-            let length = (text.string as NSString).length
-            let range = NSRange(location: min(jump.range.location, length), length: min(jump.range.length, max(0, length - jump.range.location)))
-            text.setSelectedRange(range)
-            if jump.restoreScroll { c.restoreScroll() } else { text.scrollRangeToVisible(range) }
-        } else if document.layout.mode == .split && abs(c.lastScroll - document.layout.sourceScroll) > 0.005 {
-            c.restoreScroll()
-        }
-        text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: (text.string as NSString).length))
-        for thread in document.comments.threads where !thread.isResolved {
-            if let range = thread.locate(in: document.text).range {
-                text.layoutManager?.addTemporaryAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(thread.id == document.selectedThread ? 0.4 : 0.18), forCharacterRange: range.nsRange)
-            }
-        }
+        context.coordinator.parent = self
+        context.coordinator.scheduleRefresh()
     }
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
         coordinator.text?.selectionPopover.hide()
@@ -196,15 +194,67 @@ struct SourcePane: NSViewRepresentable {
         var lastJump: UUID?
         var restoring = false
         var lastScroll = -1.0
-        init(_ parent: SourcePane) { self.parent = parent }
+        private var lastSynchronizedText: String
+        private var applyingDocumentText = false
+        private var refreshPending = false
+        private var scrollPending = false
+        init(_ parent: SourcePane) { self.parent = parent; lastSynchronizedText = parent.document.text }
+        func scheduleRefresh() {
+            guard !refreshPending else { return }
+            refreshPending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.refreshPending = false
+                self.refreshEditor()
+            }
+        }
+        private func refreshEditor() {
+            guard let text, let scroll, !text.hasMarkedText() else { return }
+            let document = parent.document
+            // A native prediction can differ from the committed model without being an external edit.
+            if document.text != lastSynchronizedText {
+                let selection = text.selectedRange()
+                applyingDocumentText = true
+                lastSynchronizedText = document.text
+                if text.string != document.text { text.string = document.text }
+                text.setSelectedRange(NSRange(location: min(selection.location, (document.text as NSString).length), length: 0))
+                applyingDocumentText = false
+            }
+            (scroll as? EditorScrollView)?.updateDocumentSize()
+            if let jump = document.jump, self.lastJump != jump.id {
+                self.lastJump = jump.id
+                let length = (text.string as NSString).length
+                let range = NSRange(location: min(jump.range.location, length), length: min(jump.range.length, max(0, length - jump.range.location)))
+                text.setSelectedRange(range)
+                if jump.restoreScroll { self.restoreScroll() } else { text.scrollRangeToVisible(range) }
+            } else if document.layout.mode == .split && abs(self.lastScroll - document.layout.sourceScroll) > 0.005 {
+                self.restoreScroll()
+            }
+            text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: (text.string as NSString).length))
+            for thread in document.comments.threads where !thread.isResolved {
+                if let range = thread.locate(in: document.text).range {
+                    text.layoutManager?.addTemporaryAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(thread.id == document.selectedThread ? 0.4 : 0.18), forCharacterRange: range.nsRange)
+                }
+            }
+        }
+
         deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
         func textDidChange(_ notification: Notification) {
-            if let text { parent.document.changed(text.string) }
+            nativeTextChanged()
+        }
+        func nativeTextChanged() {
+            guard !applyingDocumentText, let text, !text.hasMarkedText() else { return }
+            let value = text.string
+            if value != lastSynchronizedText {
+                lastSynchronizedText = value
+                parent.document.changed(value)
+            }
             (scroll as? EditorScrollView)?.updateDocumentSize()
+            scheduleRefresh()
         }
         func undoManager(for view: NSTextView) -> UndoManager? { parent.document.undoManager }
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard let text else { return }
+            guard !applyingDocumentText, let text, !text.hasMarkedText() else { return }
             parent.document.selection = text.selectedRange(); parent.document.layout.cursorLocation = text.selectedRange().location
             parent.document.onChange?()
             showSelectionComment()
@@ -224,18 +274,29 @@ struct SourcePane: NSViewRepresentable {
             }
         }
         func scrolled() {
+            guard !restoring, !scrollPending else { return }
+            scrollPending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.scrollPending = false
+                self.publishScroll()
+            }
+        }
+        private func publishScroll() {
             guard !restoring, let scroll, let text else { return }
             text.selectionPopover.hide()
             let maxY = max(1, text.bounds.height - scroll.contentView.bounds.height)
             let fraction = max(0, min(1, scroll.contentView.bounds.origin.y / maxY))
-            lastScroll = fraction; parent.document.layout.sourceScroll = fraction
-            if parent.document.layout.mode == .split { parent.document.layout.renderedScroll = fraction }
-            parent.document.onChange?()
+            guard abs(lastScroll - fraction) > 0.005 else { return }
+            lastScroll = fraction
+            var layout = parent.document.layout
+            layout.sourceScroll = fraction
+            if layout.mode == .split { layout.renderedScroll = fraction }
+            if layout != parent.document.layout { parent.document.layout = layout; parent.document.onChange?() }
         }
         func restoreScroll() {
             guard let text, let scroll else { return }
             restoring = true
-            text.layoutManager?.ensureLayout(for: text.textContainer!)
             let fraction = parent.document.layout.sourceScroll
             scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: max(0, text.bounds.height - scroll.contentView.bounds.height) * fraction))
             scroll.reflectScrolledClipView(scroll.contentView); lastScroll = fraction

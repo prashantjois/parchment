@@ -60,6 +60,7 @@ final class PreviewWebView: WKWebView, NSMenuItemValidation {
 struct RenderedPane: NSViewRepresentable {
     @ObservedObject var document: EditorDocument
     @ObservedObject var themes: ThemeLibrary
+    var minimumContentWidth: CGFloat? = nil
     var previewCSS: String? = nil
     var allowsComments = true
     var openDocument: ((URL) -> Void)? = nil
@@ -68,7 +69,7 @@ struct RenderedPane: NSViewRepresentable {
     @AppStorage("loadRemoteImages") private var loadRemoteImages = false
     @Environment(\.colorScheme) private var colorScheme
     func makeCoordinator() -> Coordinator { Coordinator(self) }
-    func makeNSView(context: Context) -> PreviewWebView {
+    func makeNSView(context: Context) -> NSView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "parchment")
         let web = PreviewWebView(frame: .zero, configuration: config)
@@ -82,13 +83,27 @@ struct RenderedPane: NSViewRepresentable {
         if allowsComments { web.commentAction = { [weak coordinator = context.coordinator] in coordinator?.requestComment() } }
         web.setValue(false, forKey: "drawsBackground")
         context.coordinator.web = web
-        return web
+        guard let minimumContentWidth else { return web }
+        let scroll = EditorViewportScrollView()
+        scroll.scrollerStyle = .legacy
+        scroll.hasHorizontalScroller = true; scroll.hasVerticalScroller = false
+        scroll.autohidesScrollers = false; scroll.drawsBackground = true; scroll.borderType = .noBorder
+        scroll.horizontalScrollElasticity = .none; scroll.verticalScrollElasticity = .none
+        scroll.documentView = web; scroll.minimumContentWidth = minimumContentWidth
+        return scroll
     }
-    static func dismantleNSView(_ web: PreviewWebView, coordinator: Coordinator) {
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        guard let web = coordinator.web else { return }
         web.configuration.userContentController.removeScriptMessageHandler(forName: "parchment")
         web.selectionPopover.hide()
     }
-    func updateNSView(_ web: PreviewWebView, context: Context) {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSView, context: Context) -> CGSize? {
+        guard minimumContentWidth != nil else { return nil }
+        return proposal.replacingUnspecifiedDimensions(by: CGSize(width: EditorPaneLayout.renderedMinimum, height: 480))
+    }
+    func updateNSView(_ view: NSView, context: Context) {
+        guard let web = context.coordinator.web else { return }
+        if let scroll = view as? EditorViewportScrollView { scroll.minimumContentWidth = minimumContentWidth ?? 0 }
         let c = context.coordinator; c.parent = self
         let dark = themes.appearance == "dark" || (themes.appearance == "system" && colorScheme == .dark)
         let css = themes.css(dark: dark, preview: previewCSS)

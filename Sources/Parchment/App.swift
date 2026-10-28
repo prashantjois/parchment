@@ -278,11 +278,9 @@ struct DocumentWorkspace: View {
                         .allowsHitTesting(layout.splitLimits.upperBound - layout.splitLimits.lowerBound > 0.0001)
                 }
                 if document.layout.mode != .raw {
-                    let contentWidth = max(EditorPaneLayout.renderedMinimum, layout.renderedWidth)
-                    EditorViewport(contentWidth: contentWidth) {
-                        RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL,
-                                     beginComment: workspace.beginComment).frame(width: contentWidth).frame(maxHeight: .infinity)
-                    }.frame(width: layout.renderedWidth)
+                    RenderedPane(document: document, themes: workspace.themes, minimumContentWidth: EditorPaneLayout.renderedMinimum,
+                                 openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment)
+                        .frame(width: layout.renderedWidth)
                 }
             }.frame(width: layout.width).frame(maxHeight: .infinity)
         }

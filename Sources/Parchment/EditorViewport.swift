@@ -76,31 +76,3 @@ final class EditorViewportScrollView: NSScrollView {
         }
     }
 }
-
-struct EditorViewport<Content: View>: NSViewRepresentable {
-    var contentWidth: CGFloat
-    var content: Content
-
-    init(contentWidth: CGFloat, @ViewBuilder content: () -> Content) {
-        self.contentWidth = contentWidth
-        self.content = content()
-    }
-    func makeNSView(context: Context) -> EditorViewportScrollView {
-        let scroll = EditorViewportScrollView()
-        // Keep the overflow control visible even with the system's overlay preference.
-        scroll.scrollerStyle = .legacy
-        scroll.hasHorizontalScroller = true; scroll.hasVerticalScroller = false
-        scroll.autohidesScrollers = false; scroll.drawsBackground = true
-        scroll.borderType = .noBorder
-        scroll.horizontalScrollElasticity = .none; scroll.verticalScrollElasticity = .none
-        let host = NSHostingView(rootView: content)
-        host.sizingOptions = []
-        scroll.documentView = host
-        scroll.minimumContentWidth = contentWidth
-        return scroll
-    }
-    func updateNSView(_ scroll: EditorViewportScrollView, context: Context) {
-        (scroll.documentView as? NSHostingView<Content>)?.rootView = content
-        scroll.minimumContentWidth = contentWidth
-    }
-}
