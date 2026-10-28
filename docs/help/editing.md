@@ -2,6 +2,8 @@
 
 Each file opens in a tab. An already open file activates its existing tab. Each file remembers its view mode, sidebar widths, split divider, cursor, and scroll position.
 
+Hover over an enabled button to see its highlight. Pause over a button to see a tooltip with its action and available shortcut. This feedback covers toolbar buttons, tab icons, sidebar actions, comments, reviews, and theme controls. Disabled buttons remain unhighlighted.
+
 Drag a tab to reorder it. The insertion marker shows the drop position before or after another tab. Tab order survives a restart. Reordering preserves the active tab and unsaved edits.
 
 Right-click a tab for **Add File Comment**, **Close Tab**, **Close Tabs Before**, **Close Tabs After**, or **Close All Tabs**. Add File Comment opens the composer for the clicked tab, even when another tab is active. Before and After refer to the clicked tab in the current tab order. These actions preserve the existing save prompts. If you cancel a prompt or a save fails, bulk closing stops. Tabs already closed remain closed.

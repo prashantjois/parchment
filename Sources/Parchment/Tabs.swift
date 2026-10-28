@@ -60,12 +60,13 @@ struct DocumentTab: View {
             Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
             Text(document.title).font(.system(size: 12, weight: selected ? .semibold : .regular)).lineLimit(1)
                 .background(TabCommentHover(action: comment))
+                .help(document.url?.path ?? "Unsaved document")
             if document.isDirty { Circle().fill(.secondary).frame(width: 5, height: 5) }
             Button(action: comment) { Image(systemName: "text.bubble").font(.system(size: 11)).padding(3) }
-                .buttonStyle(.plain).help("Add File Comment (⌃⇧M)").accessibilityLabel("Add a comment to \(document.title)")
+                .buttonStyle(.plain).buttonFeedback("Add File Comment (⌃⇧M)").accessibilityLabel("Add a comment to \(document.title)")
             Button { workspace.close(document) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).padding(4)
-            }.buttonStyle(.plain).help("Close Tab (⌘W)")
+            }.buttonStyle(.plain).buttonFeedback("Close Tab (⌘W)")
         }.padding(.horizontal, 14).frame(height: 38).frame(minWidth: 130, maxWidth: 240)
             .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
             .overlay(alignment: .bottom) { if selected { Rectangle().fill(Color.accentColor).frame(height: 2) } }
@@ -75,7 +76,6 @@ struct DocumentTab: View {
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
             .contentShape(Rectangle())
             .onTapGesture { workspace.activeID = document.id; workspace.scheduleRecovery() }
-            .help(document.url?.path ?? "Unsaved document")
             .onDrag {
                 SelectionCommentPopover.hideAll()
                 return DocumentTabDrag.provider(for: document.id)

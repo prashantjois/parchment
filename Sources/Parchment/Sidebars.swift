@@ -28,7 +28,7 @@ struct FileBrowser: View {
                 Image(systemName: "folder").foregroundStyle(.secondary)
                 Text(document.browserRoot.lastPathComponent.isEmpty ? "/" : document.browserRoot.lastPathComponent).font(.headline).lineLimit(1).help(document.browserRoot.path)
                 Spacer()
-                Button { document.browserRoot = document.browserRoot.deletingLastPathComponent() } label: { Image(systemName: "arrow.up") }.buttonStyle(.borderless).help("Parent Folder (⌘↑ while browser has focus)")
+                Button { document.browserRoot = document.browserRoot.deletingLastPathComponent() } label: { Image(systemName: "arrow.up") }.buttonStyle(.borderless).buttonFeedback("Parent Folder (⌘↑ while browser has focus)")
             }.padding(12)
             Divider()
             ScrollView {
@@ -71,6 +71,7 @@ struct BrowserRow: View {
                 }.padding(.vertical, 6).padding(.horizontal, 5).contentShape(Rectangle())
                     .background(document.url == entry.url ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 5))
             }.buttonStyle(.plain)
+                .buttonFeedback(entry.directory ? "\(expanded ? "Collapse" : "Expand") \(entry.url.path)" : "Open \(entry.url.path)")
                 .contextMenu {
                     FileLocationMenu(name: entry.url.lastPathComponent, url: entry.url, isDirectory: entry.directory)
                 }
@@ -95,7 +96,7 @@ struct ContentsSidebar: View {
                             Text(heading.title).font(heading.level == 1 ? .headline : .body).lineLimit(2)
                                 .padding(.vertical, 7).padding(.leading, CGFloat(heading.level - 1) * 12 + 12)
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.plain).buttonFeedback("Jump to \(heading.title)")
                     }
                 }.padding(.vertical, 6)
             }
@@ -120,9 +121,9 @@ struct CommentsSidebar: View {
                 Label("Comments", systemImage: "text.bubble").font(.headline)
                 Spacer()
                 if document.unreadThreadCount > 0 {
-                    Button("\(document.unreadThreadCount) unread") { filter = "Unread" }.font(.caption).buttonStyle(.borderless)
+                    Button("\(document.unreadThreadCount) unread") { filter = "Unread" }.font(.caption).buttonStyle(.borderless).buttonFeedback("Show unread comments and replies")
                 }
-                Button(action: beginComment) { Image(systemName: "plus") }.buttonStyle(.borderless).disabled(document.selection.length == 0).help("Add Comment (⌃M)")
+                Button(action: beginComment) { Image(systemName: "plus") }.buttonStyle(.borderless).buttonFeedback("Add a comment to the selected text (⌃M)").disabled(document.selection.length == 0)
             }.padding(14)
             if document.integrationAttachment["status"].string == "attached" {
                 VStack(alignment: .leading, spacing: 6) {
@@ -139,7 +140,7 @@ struct CommentsSidebar: View {
                              : "Automatic feedback delivery is not configured")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Button("Disconnect Agent…") { disconnectAgent = true }.buttonStyle(.borderless).font(.caption)
+                    Button("Disconnect Agent…") { disconnectAgent = true }.buttonStyle(.borderless).font(.caption).buttonFeedback("Disconnect this document from the attached agent conversation")
                 }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(.tint.opacity(0.07), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 10).padding(.bottom, 10)
             }
@@ -151,15 +152,15 @@ struct CommentsSidebar: View {
                     Label("Review in progress", systemImage: "square.and.pencil").font(.headline)
                     Text("\(document.comments.pendingCount) pending comments and replies").font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Button("Finish Review…") { finishReview = true }.buttonStyle(.borderedProminent)
+                        Button("Finish Review…") { finishReview = true }.buttonStyle(.borderedProminent).buttonFeedback("Review pending comments and replies before publication")
                         Spacer()
-                        Button("Discard") { discardReview = true }.buttonStyle(.borderless)
+                        Button("Discard") { discardReview = true }.buttonStyle(.borderless).buttonFeedback("Discard this review and its pending comments")
                     }
                 }.padding(12).background(.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 10).padding(.bottom, 10)
             } else {
-                Button("Start a Review") { document.startReview(); filter = "Pending" }.buttonStyle(.borderless).padding(.horizontal, 14).padding(.bottom, 12)
+                Button("Start a Review") { document.startReview(); filter = "Pending" }.buttonStyle(.borderless).buttonFeedback("Start a review and keep comments pending until publication").padding(.horizontal, 14).padding(.bottom, 12)
             }
-            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Unread").tag("Unread"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.menu).controlSize(.small).padding(.horizontal, 10).padding(.bottom, 10)
+            Picker("Show", selection: $filter) { Text("Open").tag("Open"); Text("Unread").tag("Unread"); Text("Pending").tag("Pending"); Text("Resolved").tag("Resolved"); Text("All").tag("All") }.pickerStyle(.menu).controlSize(.small).buttonFeedback("Filter the comments shown in this sidebar").padding(.horizontal, 10).padding(.bottom, 10)
             Divider()
             ScrollViewReader { reader in
                 ScrollView {
@@ -191,7 +192,7 @@ struct CommentsSidebar: View {
                 }
             }
             Divider()
-            Button("Export Open Comments for Agent…", action: export).buttonStyle(.borderless).padding(12).disabled(document.comments.threads.allSatisfy { $0.isResolved || $0.isPending } && !(document.comments.reviews ?? []).contains { $0.submittedAt != nil })
+            Button("Export Open Comments for Agent…", action: export).buttonStyle(.borderless).buttonFeedback("Export published feedback and the current document text").padding(12).disabled(document.comments.threads.allSatisfy { $0.isResolved || $0.isPending } && !(document.comments.reviews ?? []).contains { $0.submittedAt != nil })
         }.background(.bar)
             .sheet(isPresented: $finishReview) { ReviewSubmission(document: document) }
             .confirmationDialog("Discard this review and its pending comments?", isPresented: $discardReview) {
@@ -222,7 +223,7 @@ struct ThreadCard: View {
                     Spacer()
                     Button(document.isUnread(thread) ? "Mark as Read" : "Mark as Unread") {
                         if document.isUnread(thread) { document.markThreadRead(thread) } else { document.markThreadUnread(thread) }
-                    }.buttonStyle(.borderless).font(.caption)
+                    }.buttonStyle(.borderless).font(.caption).buttonFeedback(document.isUnread(thread) ? "Mark this discussion as read" : "Mark this discussion as unread")
                 }
             }
             discussion.simultaneousGesture(TapGesture().onEnded { document.markThreadRead(thread) })
@@ -248,7 +249,7 @@ struct ThreadCard: View {
                     Text(thread.isFileLevel ? "Entire file · \(document.title)" : thread.anchor.quote).font(.caption).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
                     if thread.isResolved { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
                 }.fixedSize(horizontal: false, vertical: true)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).buttonFeedback(thread.isFileLevel ? "Select this file comment" : "Show the commented text in the document")
             if !thread.isFileLevel && match.range == nil {
                 Text(match.state == .ambiguous ? "This text occurs more than once. Select the correct text to reattach." : "The original text changed. Select text to reattach this thread.")
                     .font(.caption).foregroundStyle(.orange)
@@ -256,7 +257,7 @@ struct ThreadCard: View {
                     let range = TextSpan(location: document.selection.location, length: document.selection.length)
                     guard range.isValid(in: document.text) else { return }
                     document.append(CommentEvent(kind: .reanchor, author: NSFullUserName(), anchor: CommentAnchor(text: document.text, range: range)), to: thread.id)
-                }.disabled(document.selection.length == 0)
+                }.buttonFeedback("Attach this discussion to the selected text").disabled(document.selection.length == 0)
             }
             ForEach(thread.messages) { message in
                 VStack(alignment: .leading, spacing: 4) {
@@ -269,8 +270,8 @@ struct ThreadCard: View {
                     if editingMessage == message.id {
                         TextField("Comment", text: $editedBody, axis: .vertical).lineLimit(2...8).textFieldStyle(.roundedBorder)
                         HStack {
-                            Button("Save Draft") { document.editPendingMessage(message.id, in: thread.id, body: editedBody); editingMessage = nil }.disabled(editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            Button("Cancel") { editingMessage = nil }
+                            Button("Save Draft") { document.editPendingMessage(message.id, in: thread.id, body: editedBody); editingMessage = nil }.buttonFeedback("Save changes to this pending comment").disabled(editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            Button("Cancel") { editingMessage = nil }.buttonFeedback("Cancel changes to this pending comment")
                         }
                     } else {
                         Text(message.body ?? "").font(.callout).textSelection(.enabled)
@@ -278,8 +279,8 @@ struct ThreadCard: View {
                             HStack {
                                 Text("Pending").foregroundStyle(.orange)
                                 Spacer()
-                                Button("Edit") { editedBody = message.body ?? ""; editingMessage = message.id }
-                                Button("Delete", role: .destructive) { document.removePendingMessage(message.id, in: thread.id) }
+                                Button("Edit") { editedBody = message.body ?? ""; editingMessage = message.id }.buttonFeedback("Edit this pending comment")
+                                Button("Delete", role: .destructive) { document.removePendingMessage(message.id, in: thread.id) }.buttonFeedback("Delete this pending comment")
                             }.font(.caption).buttonStyle(.borderless)
                         }
                     }
@@ -290,17 +291,17 @@ struct ThreadCard: View {
                 HStack {
                     Button(document.comments.activeReview != nil ? "Add to Review" : "Reply") {
                         document.addReply(reply, to: thread.id, pending: document.comments.activeReview != nil); reply = ""
-                    }.disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }.buttonFeedback(document.comments.activeReview != nil ? "Add this reply to the pending review" : "Publish this reply").disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Spacer()
                     if !thread.isPending {
-                        Button("Resolve") { document.append(CommentEvent(kind: .resolve, author: NSFullUserName()), to: thread.id) }
+                        Button("Resolve") { document.append(CommentEvent(kind: .resolve, author: NSFullUserName()), to: thread.id) }.buttonFeedback("Resolve this discussion")
                     }
                 }
                 if document.comments.activeReview != nil && !thread.isPending {
-                    Button("Reply Now") { document.addReply(reply, to: thread.id, pending: false); reply = "" }.buttonStyle(.borderless).disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Reply Now") { document.addReply(reply, to: thread.id, pending: false); reply = "" }.buttonStyle(.borderless).buttonFeedback("Publish this reply immediately").disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             } else {
-                Button("Reopen Thread") { document.append(CommentEvent(kind: .reopen, author: NSFullUserName()), to: thread.id) }
+                Button("Reopen Thread") { document.append(CommentEvent(kind: .reopen, author: NSFullUserName()), to: thread.id) }.buttonFeedback("Reopen this resolved discussion")
             }
             DisclosureGroup("History", isExpanded: $history) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -312,7 +313,7 @@ struct ThreadCard: View {
                         }
                     }
                 }.padding(.top, 6)
-            }.font(.caption).foregroundStyle(.secondary)
+            }.font(.caption).foregroundStyle(.secondary).help(history ? "Hide discussion history" : "Show discussion history")
         }
     }
 }
@@ -338,13 +339,13 @@ struct CommentComposer: View {
             HStack {
                 Text(document.url == nil ? "Save this document to create its companion file." : "Saved beside \(document.title)").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).buttonFeedback("Cancel this comment (Escape)")
                 if document.comments.activeReview != nil {
-                    Button("Comment Now") { submit(pending: false) }.disabled(cannotSubmit)
-                    Button("Add to Review") { submit(pending: true) }.keyboardShortcut(.defaultAction).disabled(cannotSubmit)
+                    Button("Comment Now") { submit(pending: false) }.buttonFeedback("Publish this comment immediately").disabled(cannotSubmit)
+                    Button("Add to Review") { submit(pending: true) }.keyboardShortcut(.defaultAction).buttonFeedback("Add this comment to the pending review (Return)").disabled(cannotSubmit)
                 } else {
-                    Button("Start a Review") { submit(pending: true) }.disabled(cannotSubmit)
-                    Button("Comment Now") { submit(pending: false) }.keyboardShortcut(.defaultAction).disabled(cannotSubmit)
+                    Button("Start a Review") { submit(pending: true) }.buttonFeedback("Start a pending review with this comment").disabled(cannotSubmit)
+                    Button("Comment Now") { submit(pending: false) }.keyboardShortcut(.defaultAction).buttonFeedback("Publish this comment immediately (Return)").disabled(cannotSubmit)
                 }
             }
             Text(document.comments.activeReview == nil ? "Comment now publishes immediately. Start a review keeps your comments pending until submission." : "Review comments stay pending until you submit the review. Comment now publishes this comment immediately.").font(.caption).foregroundStyle(.secondary)
@@ -385,8 +386,8 @@ struct ReviewSubmission: View {
             TextEditor(text: $summary).font(.body).frame(height: 90).border(.quaternary)
             HStack {
                 Spacer()
-                Button("Keep Reviewing") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Submit Review") { document.submitReview(summary: summary); dismiss() }.keyboardShortcut(.defaultAction).disabled(document.comments.pendingCount == 0 && summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Keep Reviewing") { dismiss() }.keyboardShortcut(.cancelAction).buttonFeedback("Return to the pending review (Escape)")
+                Button("Submit Review") { document.submitReview(summary: summary); dismiss() }.keyboardShortcut(.defaultAction).buttonFeedback("Publish all pending comments, replies, and the review summary (Return)").disabled(document.comments.pendingCount == 0 && summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }.padding(24).frame(width: 540)
     }

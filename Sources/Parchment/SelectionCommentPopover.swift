@@ -32,7 +32,8 @@ private final class CommentPopoverBackground: NSVisualEffectView {
         background.wantsLayer = true; background.layer?.cornerRadius = 8
         let button = NSButton(title: fileLevel ? "Comment  ⌃⇧M" : "Comment  ⌃M", target: self, action: #selector(comment))
         button.image = NSImage(systemSymbolName: "text.bubble", accessibilityDescription: "Comment")
-        button.imagePosition = .imageLeading; button.isBordered = false
+        button.imagePosition = .imageLeading; button.bezelStyle = .recessed
+        button.isBordered = true; button.showsBorderOnlyWhileMouseInside = true
         button.frame = background.bounds.insetBy(dx: 12, dy: 6); button.autoresizingMask = [.width, .height]
         button.toolTip = fileLevel ? "Add a comment to this file" : "Add a comment to the selected text"
         background.addSubview(button); panel.contentView = background

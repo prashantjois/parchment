@@ -87,32 +87,32 @@ struct ThemeSettings: View {
     @StateObject private var sample = EditorDocument(url: nil, text: "# A place for your words\n\nA native editor for **clear ideas**, thoughtful notes, and [useful links](https://example.com).\n\n## The details matter\n\n> Good writing starts with room to think.\n\n- Local Markdown files\n- Your fonts and colors\n- Comments that stay with the document\n\n```swift\nlet idea = \"Something worth keeping\"\n```\n\n| Feature | Status |\n| --- | --- |\n| Light and dark | Ready |")
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("Themes").font(.title2.bold()); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+            HStack { Text("Themes").font(.title2.bold()); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonFeedback("Close theme settings (Return)") }
             HStack(alignment: .top, spacing: 20) {
                 Form {
-                    Picker("Theme", selection: $library.selectedID) { ForEach(library.items) { Text($0.name).tag($0.id) } }
+                    Picker("Theme", selection: $library.selectedID) { ForEach(library.items) { Text($0.name).tag($0.id) } }.buttonFeedback("Choose the document theme")
                     Picker("Appearance", selection: $library.appearance) {
                         Text("Follow System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
-                    }
+                    }.buttonFeedback("Choose system, light, or dark appearance")
                     HStack {
                         Text("Font size")
-                        Stepper(library.fontSize == 0 ? "Theme default" : "\(Int(library.fontSize)) px", value: $library.fontSize, in: 0...40)
+                        Stepper(library.fontSize == 0 ? "Theme default" : "\(Int(library.fontSize)) px", value: $library.fontSize, in: 0...40).help("Adjust the document font size. Zero uses the theme default.")
                     }
                     Picker("Body font", selection: $library.customFont) {
                         Text("Theme default").tag("")
                         ForEach(["Georgia", "Charter", "Menlo", "Avenir Next", "Helvetica Neue", "Palatino", "Baskerville"], id: \.self) { Text($0).tag($0) }
-                    }
+                    }.buttonFeedback("Choose the document body font")
                     TextField("Light text color", text: $library.lightText, prompt: Text("#242424"))
                     TextField("Dark text color", text: $library.darkText, prompt: Text("#f2f2f7"))
                     Text("Leave colors empty to use the theme palette. Font size 0 uses the theme default.").font(.caption).foregroundStyle(.secondary)
-                    Button("Reset overrides") { library.fontSize = 0; library.customFont = ""; library.lightText = ""; library.darkText = "" }
+                    Button("Reset overrides") { library.fontSize = 0; library.customFont = ""; library.lightText = ""; library.darkText = "" }.buttonFeedback("Restore the theme's font size, font, and text colors")
                     Divider()
                     Text("Theme CSS").font(.headline)
                     TextEditor(text: $css).font(.system(size: 11, design: .monospaced)).frame(height: 220).border(.quaternary)
                     TextField("Custom theme name", text: $name)
                     HStack {
-                        Button("Preview CSS") { validateAnd { preview = true } }
-                        Button("Save as Custom") { validateAnd { do { try library.duplicate(css: css, name: name); preview = false } catch { self.error = error.localizedDescription } } }
+                        Button("Preview CSS") { validateAnd { preview = true } }.buttonFeedback("Validate this CSS and preview it on the sample document")
+                        Button("Save as Custom") { validateAnd { do { try library.duplicate(css: css, name: name); preview = false } catch { self.error = error.localizedDescription } } }.buttonFeedback("Save this CSS as a new custom theme")
                     }
                     Button("Import CSS…") {
                         let panel = NSOpenPanel(); panel.allowedContentTypes = [.init(filenameExtension: "css") ?? .plainText]
@@ -120,7 +120,7 @@ struct ThemeSettings: View {
                             do { css = try String(contentsOf: url, encoding: .utf8); name = url.deletingPathExtension().lastPathComponent }
                             catch { self.error = error.localizedDescription }
                         }
-                    }
+                    }.buttonFeedback("Import a CSS theme from a file")
                 }.formStyle(.grouped).frame(width: 390)
                 RenderedPane(document: sample, themes: library, previewCSS: preview ? css : nil, allowsComments: false, beginComment: {}).frame(minWidth: 400)
             }

@@ -109,6 +109,7 @@ struct AppSettings: View {
         TabView {
             Form {
                 Toggle("Automatically load remote images", isOn: $loadRemoteImages)
+                    .help("Load remote images automatically in every document")
                 Text("When disabled, right-click a remote image placeholder to load that image or enable automatic loading.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(24).tabItem { Label("General", systemImage: "gearshape") }
@@ -173,7 +174,10 @@ struct WorkspaceView: View {
                     Image(systemName: "doc.richtext").font(.system(size: 52, weight: .light)).foregroundStyle(.secondary)
                     Text("A place for your words").font(.title)
                     Text("Open a Markdown file or start a new document.").foregroundStyle(.secondary)
-                    HStack { Button("New Document") { workspace.newDocument() }; Button("Open…") { workspace.openPanel() } }
+                    HStack {
+                        Button("New Document") { workspace.newDocument() }.buttonFeedback("Create a new document (⌘N)")
+                        Button("Open…") { workspace.openPanel() }.buttonFeedback("Open a document (⌘O)")
+                    }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -181,9 +185,9 @@ struct WorkspaceView: View {
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button(action: workspace.goBack) { Label("Back", systemImage: "chevron.left") }
-                    .disabled(!workspace.canGoBack).help("Back (⌘[)")
+                    .buttonFeedback("Back (⌘[)").disabled(!workspace.canGoBack)
                 Button(action: workspace.goForward) { Label("Forward", systemImage: "chevron.right") }
-                    .disabled(!workspace.canGoForward).help("Forward (⌘])")
+                    .buttonFeedback("Forward (⌘])").disabled(!workspace.canGoForward)
             }
         }
         .sheet(isPresented: $workspace.showThemes) { ThemeSettings(library: workspace.themes) }
@@ -268,7 +272,7 @@ struct DocumentWorkspace: View {
         else { RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment) }
     }
     func toolbarButton(_ title: String, icon: String, shortcut: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Label(title, systemImage: icon).foregroundStyle(active ? Color.accentColor : Color.primary) }.help("\(title) (\(shortcut))")
+        Button(action: action) { Label(title, systemImage: icon).foregroundStyle(active ? Color.accentColor : Color.primary) }.buttonFeedback("\(title) (\(shortcut))")
     }
 }
 
