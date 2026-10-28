@@ -14,7 +14,7 @@ Use the macOS installer (`.pkg`) to install or upgrade Parchment. Download it fr
 4. Complete the installation.
 5. Open Parchment from Applications or Spotlight.
 
-The installer places the app in `/Applications/Parchment.app`. Normal editor use requires no network connection. Local builds and installers are in `dist/`, which Git excludes.
+The installer places the app in `/Applications/Parchment.app`. All three setup options are selected by default, including the default Markdown app. Clear an option to skip it. Normal editor use requires no network connection. Local builds and installers are in `dist/`, which Git excludes.
 
 ### macOS security prompt
 
@@ -37,9 +37,11 @@ From this checkout, run:
 bash scripts/install.sh
 ```
 
-From a source checkout, the script selects the version in `scripts/Info.plist`. It uses a matching installer from `dist/` if available. Otherwise, it downloads that exact version. If that version is not published, installation stops instead of selecting an older release. Build it with `bash scripts/build-installer.sh`, then run the install script again.
+The script first asks which version to install. Press Enter for `latest`, or enter a version such as `0.1.26`. The default always selects the latest published GitHub Release, including from a source checkout.
 
-A standalone copy of the script downloads the latest published GitHub Release. A local build does not become a published release automatically. Use `--version` to select a specific published release explicitly.
+The script reuses a matching installer in `dist/` when available. Otherwise, it downloads the selected version. If that version is unpublished and has no local installer, installation stops. Build it with `bash scripts/build-installer.sh`, then select that version explicitly or supply its package path.
+
+Use `--version VERSION` or `--package PATH` to skip the version question. If the release lookup is unavailable, use an explicit version with a matching local installer, or supply its package path.
 
 The script verifies the package checksum before installation. It runs macOS's command-line installer with the same setup actions as the graphical installer. Only the installation step requests administrator access. Run the script without `sudo`.
 
@@ -47,15 +49,16 @@ After verification, the script requests a normal quit from any running Parchment
 
 The script requires no Swift toolchain, Python, or GitHub CLI. It avoids opening the package in Finder, but it does not sign or notarize Parchment. A first-launch security prompt can still require **Open Anyway**.
 
-The script asks three questions before the download and installation:
+The script asks for a version and three setup choices:
 
 ```text
+Version to install [latest]:
 Install the Parchment agent skill in ~/.agents/skills/parchment? [Y/n]
 Register parchment:// links now? [Y/n]
-Make Parchment the default app for .md and .markdown files? [y/N]
+Make Parchment the default app for .md and .markdown files? [Y/n]
 ```
 
-Enter `y` or `n` for each question. Press Enter to accept the default. The defaults match the graphical installer: skill and link registration on, default Markdown app off.
+Enter a version or `latest` for the first question. Enter `y` or `n` for each setup question. Press Enter to accept each default. All three setup defaults match the graphical installer: on.
 
 Flags answer individual questions. The script still asks about any choice without an explicit answer.
 
@@ -65,7 +68,7 @@ Flags answer individual questions. The script still asks about any choice withou
 | Register `parchment://` links immediately | `--register` | `--skip-register` |
 | Set the default app for `.md` and `.markdown` files | `--markdown-default` | `--skip-markdown-default` |
 
-Use `--yes` to skip setup questions and accept defaults for unspecified choices. Without interactive input, supply `--yes` or explicit answers for all three choices. If input ends during a prompt, the script cancels installation.
+Use `--yes` to skip all questions and accept defaults for unspecified choices. Without interactive input, supply `--yes`, or a version/package flag and explicit answers for all three setup choices. If input ends during a prompt, the script cancels installation.
 
 The skill installer backs up a different existing copy. Skipping link registration preserves existing registrations. The default app choice leaves `.txt` files unchanged. MCP client configuration remains a separate step.
 
@@ -78,10 +81,10 @@ bash scripts/install.sh --yes --skip-skill --markdown-default
 To install a local build, keep its `.pkg.sha256` file beside the package and run:
 
 ```sh
-bash scripts/install.sh --package dist/Parchment-0.1.17-arm64.pkg
+bash scripts/install.sh --package dist/Parchment-0.1.26-arm64.pkg
 ```
 
-Use `--version 0.1.12` to select a published version. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
+Use `--version 0.1.26` to select that version, or `--version latest` to select the latest published release. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
 
 ### Build from source
 

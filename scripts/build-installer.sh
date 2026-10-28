@@ -58,7 +58,7 @@ ET.SubElement(distribution, 'pkg-ref', {'id': identifier, 'version': version, 'a
 for name, title, description, selected in [
     ('skill', 'Install the Parchment agent skill', 'Install in ~/.agents/skills/parchment for the logged-in user. Back up an existing different skill. MCP client configuration is separate.', 'true'),
     ('scheme', 'Register parchment:// links now', 'Register the installed app with macOS for the logged-in user. Unchecking skips this step; macOS can still register links when the app opens. Existing registrations remain.', 'true'),
-    ('default', 'Make Parchment the default app for Markdown files', 'Open .md and .markdown files in Parchment for the logged-in user. Plain text (.txt) defaults stay unchanged. Requires the current startup volume.', 'false')
+    ('default', 'Make Parchment the default app for Markdown files', 'Open .md and .markdown files in Parchment for the logged-in user. Plain text (.txt) defaults stay unchanged. Requires the current startup volume.', 'true')
 ]:
     ET.SubElement(outline, 'line', {'choice': name})
     choice = ET.SubElement(distribution, 'choice', {'id': name, 'title': title, 'description': description, 'start_selected': selected})

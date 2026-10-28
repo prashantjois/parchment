@@ -6,13 +6,14 @@ usage() {
 Usage: bash scripts/install.sh [options]
 
 Install Parchment in /Applications using macOS's command-line installer.
-From a source checkout, use its version and prefer a matching local package.
-Otherwise, download the latest published release. Verify the checksum first.
+Choose a version interactively; Enter selects the latest published GitHub
+release, including from a source checkout. Prefer a matching local package,
+otherwise download the selected version. Verify its checksum first.
 Run without sudo; only installation requests administrator access.
 Before installation, request a normal quit from any running Parchment app.
 Stop if it refuses or does not quit within 30 seconds. A dry run leaves it open.
 
-  --version VERSION     Install a specific release (for example, 0.1.12).
+  --version VERSION     Skip the version prompt; accept a version or latest.
   --package PATH        Use a local .pkg and its adjacent .pkg.sha256 file.
   --install-skill       Install the skill without asking about it.
   --skip-skill          Skip installing the Parchment agent skill.
@@ -24,9 +25,10 @@ Stop if it refuses or does not quit within 30 seconds. A dry run leaves it open.
   --dry-run             Verify the package and show choices without installing.
   --help                Show this help.
 
-The script asks about each setup choice unless a flag supplies its answer.
-Press Enter to accept the defaults: skill and link registration on, default
-Markdown app off. Without interactive input, supply --yes or all three choices.
+The script asks which version to install, then asks about each setup choice.
+Press Enter to select latest and enable the skill, links, and Markdown default.
+Without interactive input, use --yes, or supply a version/package and all three
+setup choices. Explicit flags override defaults; --package skips version selection.
 MCP client configuration remains a separate step.
 This script does not sign or notarize the app. If macOS blocks its first launch,
 use System Settings > Privacy & Security > Open Anyway for Parchment.
@@ -60,7 +62,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 [[ -z "$version" || -z "$package" ]] || fail 'Use --version or --package, not both.'
-if [[ -n "$version" ]]; then
+if [[ -n "$version" && "$version" != latest ]]; then
     [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'Expected a release version such as 0.1.12.'
 fi
 [[ "$(uname -s)" == Darwin ]] || fail 'Parchment requires macOS 14 or later.'
@@ -80,10 +82,25 @@ prompt_choice() {
         esac
     done
 }
+if [[ -z "$package" && -z "$version" ]]; then
+    if [[ "$assume_defaults" -eq 1 ]]; then
+        version="latest"
+    else
+        [[ -t 0 ]] || fail 'No interactive input. Supply --version or --package, or use --yes.'
+        while true; do
+            printf 'Version to install [latest]: ' >&2
+            IFS= read -r version || fail 'Input ended; installation cancelled.'
+            version="${version#v}"
+            version="${version:-latest}"
+            if [[ "$version" == latest || "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then break; fi
+            printf 'Enter a version such as 0.1.25, or latest.\n' >&2
+        done
+    fi
+fi
 if [[ "$assume_defaults" -eq 1 ]]; then
     install_skill="${install_skill:-1}"
     register_scheme="${register_scheme:-1}"
-    markdown_default="${markdown_default:-0}"
+    markdown_default="${markdown_default:-1}"
 else
     if [[ -z "$install_skill" || -z "$register_scheme" || -z "$markdown_default" ]]; then
         [[ -t 0 ]] || fail 'No interactive input. Run in Terminal, supply --yes, or set all three setup choices.'
@@ -95,7 +112,7 @@ else
         prompt_choice register_scheme 'Register parchment:// links now? [Y/n]' 1
     fi
     if [[ -z "$markdown_default" ]]; then
-        prompt_choice markdown_default 'Make Parchment the default app for .md and .markdown files? [y/N]' 0
+        prompt_choice markdown_default 'Make Parchment the default app for .md and .markdown files? [Y/n]' 1
     fi
 fi
 
@@ -111,32 +128,25 @@ if [[ -z "$package" ]]; then
     if [[ "$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null || true)" == 1 ]]; then architecture=arm64; fi
     case "$architecture" in arm64|x86_64) ;; *) fail "Unsupported architecture: $architecture." ;; esac
     script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [[ -z "$version" && -f "$script_directory/Info.plist" && -f "$script_directory/../Package.swift" ]]; then
-        version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$script_directory/Info.plist")"
-        [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'The checkout has an invalid app version.'
-        local_package="$script_directory/../dist/Parchment-$version-$architecture.pkg"
-        if [[ -f "$local_package" ]]; then
-            package="$local_package"
-        elif [[ -f "$script_directory/../dist/Parchment-$version-universal.pkg" ]]; then
-            package="$script_directory/../dist/Parchment-$version-universal.pkg"
-        fi
-        if [[ -n "$package" ]]; then
-            printf 'Using the local installer for checkout version %s.\n' "$version" >&2
-        else
-            printf 'No local installer for checkout version %s; downloading that version.\n' "$version" >&2
-        fi
-    fi
-fi
-if [[ -z "$package" ]]; then
-    if [[ -z "$version" ]]; then
-        # Follow the public release redirect without GitHub API credentials or quotas.
+    if [[ "$version" == latest ]]; then
+        # Follow the release redirect without GitHub API credentials or quotas.
         latest_url="$(/usr/bin/curl --fail --location --head --silent --show-error \
             --proto '=https' --proto-redir '=https' --retry 2 --connect-timeout 20 --max-time 60 \
             --output /dev/null --write-out '%{url_effective}' \
-            'https://github.com/prashantjois/parchment/releases/latest')"
+            'https://github.com/prashantjois/parchment/releases/latest')" || fail 'Could not find the latest published version. Retry, or supply --version or --package.'
         [[ "$latest_url" =~ ^https://github\.com/prashantjois/parchment/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || fail 'The latest release has an unsupported version tag.'
         version="${BASH_REMATCH[1]}"
+        printf 'Latest published version: %s.\n' "$version" >&2
     fi
+    local_package="$script_directory/../dist/Parchment-$version-$architecture.pkg"
+    if [[ -f "$local_package" ]]; then
+        package="$local_package"
+    elif [[ -f "$script_directory/../dist/Parchment-$version-universal.pkg" ]]; then
+        package="$script_directory/../dist/Parchment-$version-universal.pkg"
+    fi
+    if [[ -n "$package" ]]; then printf 'Using the local installer for version %s.\n' "$version" >&2; fi
+fi
+if [[ -z "$package" ]]; then
     package_name="Parchment-$version-$architecture.pkg"
     release_url="https://github.com/prashantjois/parchment/releases/download/v$version"
     printf 'Downloading %s…\n' "$package_name" >&2

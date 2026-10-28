@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.25 | 26 | 2026-10-28 | Current release | Moved tab hover prompts below tabs, repaired Open Recent, and added app-wide System, Light, and Dark appearance. |
+| 0.1.26 | 27 | 2026-10-28 | Current release | Enabled Markdown association by default and added an installer version prompt with latest as its default. |
+| 0.1.25 | 26 | 2026-10-28 | `2c0576f` | Moved tab hover prompts below tabs, repaired Open Recent, and added app-wide System, Light, and Dark appearance. |
 | 0.1.24 | 25 | 2026-10-28 | `9339823` | Added separate, always-visible horizontal scrollbars for Raw and Rendered, unwrapped Raw lines, and readable wide tables. |
 | 0.1.23 | 24 | 2026-10-27 | `a7a9170` | Increased pane minimum widths, kept the horizontal scrollbar visible during overflow, and forwarded page-level WebKit wheel events. |
 | 0.1.22 | 23 | 2026-10-27 | `c56d8ab` | Added minimum pane widths and horizontal editor scrolling to prevent compressed content. |
@@ -30,6 +31,13 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.26
+
+- The install script and graphical installer select the default Markdown app option by default. Explicit skip flags and checkbox changes remain available.
+- The script asks which version to install. Enter selects latest; an explicit version or package flag skips the question.
+- Latest always selects the latest published GitHub release, including from a source checkout. Matching local installers can be reused for the selected version.
+- Unattended installation accepts the latest published version and all setup defaults with --yes. Explicit local versions and packages remain available offline.
 
 ## 0.1.25
 

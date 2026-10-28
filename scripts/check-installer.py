@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
     assert not defaults['parchment']['choiceIsEnabled']
     for option in ['skill', 'scheme', 'default']:
         assert defaults[option]['choiceIsVisible'] and defaults[option]['choiceIsEnabled']
-        assert defaults[option]['choiceIsSelected'] == (0 if option == 'default' else 1)
+        assert defaults[option]['choiceIsSelected'] == 1
     for skill, scheme, default in itertools.product([0, 1], repeat=3):
         changes = root / 'choices.plist'
         changes.write_bytes(plistlib.dumps([
