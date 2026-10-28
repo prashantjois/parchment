@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.26 | 27 | 2026-10-28 | Current release | Enabled Markdown association by default and added an installer version prompt with latest as its default. |
+| 0.1.27 | 28 | 2026-10-28 | Current release | Changed installer version selection to local releases with numeric ordering and architecture filtering. |
+| 0.1.26 | 27 | 2026-10-28 | `4a0aaae` | Enabled Markdown association by default and added an installer version prompt with latest as its default. |
 | 0.1.25 | 26 | 2026-10-28 | `2c0576f` | Moved tab hover prompts below tabs, repaired Open Recent, and added app-wide System, Light, and Dark appearance. |
 | 0.1.24 | 25 | 2026-10-28 | `9339823` | Added separate, always-visible horizontal scrollbars for Raw and Rendered, unwrapped Raw lines, and readable wide tables. |
 | 0.1.23 | 24 | 2026-10-27 | `a7a9170` | Increased pane minimum widths, kept the horizontal scrollbar visible during overflow, and forwarded page-level WebKit wheel events. |
@@ -28,9 +29,16 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.5 | 6 | 2026-10-27 | `3acd3b6`, tag `v0.1.5` | Automatic agent feedback delivery, syntax highlighting, link navigation, remote-image controls, external-change prompts, and documentation updates. |
 | 0.1.4 | 5 | 2026-10-27 | `2c3a044` | Recorded the installer-options update, frontmatter hiding, and file-location copy menus. The exact installer delta from 0.1.3 was not recorded separately. |
 | 0.1.3 | 4 | 2026-10-27 | Archived installer | Added the optional setting to make Parchment the default app for Markdown files. |
-| 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
+| 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.27
+
+- The install script selects versions from local installers in dist/. Latest uses numeric major, minor, and patch ordering.
+- Only this Mac’s architecture and universal packages qualify. An architecture-specific package takes priority at the same version.
+- Missing packages, missing checksums, or checksum errors stop installation. No GitHub lookup or download occurs.
+- The version prompt, explicit version/package flags, and Yes defaults for all setup options remain available.
 
 ## 0.1.26
 

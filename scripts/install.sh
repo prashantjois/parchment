@@ -6,9 +6,9 @@ usage() {
 Usage: bash scripts/install.sh [options]
 
 Install Parchment in /Applications using macOS's command-line installer.
-Choose a version interactively; Enter selects the latest published GitHub
-release, including from a source checkout. Prefer a matching local package,
-otherwise download the selected version. Verify its checksum first.
+Choose a version interactively; Enter selects the newest local installer in
+dist/ beside this checkout. Versions are ordered numerically. The script uses
+local packages and verifies their checksums before installation.
 Run without sudo; only installation requests administrator access.
 Before installation, request a normal quit from any running Parchment app.
 Stop if it refuses or does not quit within 30 seconds. A dry run leaves it open.
@@ -118,49 +118,45 @@ fi
 
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/parchment-install.XXXXXX")"
 trap 'rm -rf "$temporary_directory"' EXIT
-download() {
-    /usr/bin/curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' \
-        --retry 2 --connect-timeout 20 --max-time 300 "$1" --output "$2"
-}
 if [[ -z "$package" ]]; then
     architecture="$(uname -m)"
     # Prefer arm64 even when Terminal runs under Rosetta.
     if [[ "$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null || true)" == 1 ]]; then architecture=arm64; fi
     case "$architecture" in arm64|x86_64) ;; *) fail "Unsupported architecture: $architecture." ;; esac
     script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    release_directory="$script_directory/../dist"
     if [[ "$version" == latest ]]; then
-        # Follow the release redirect without GitHub API credentials or quotas.
-        latest_url="$(/usr/bin/curl --fail --location --head --silent --show-error \
-            --proto '=https' --proto-redir '=https' --retry 2 --connect-timeout 20 --max-time 60 \
-            --output /dev/null --write-out '%{url_effective}' \
-            'https://github.com/prashantjois/parchment/releases/latest')" || fail 'Could not find the latest published version. Retry, or supply --version or --package.'
-        [[ "$latest_url" =~ ^https://github\.com/prashantjois/parchment/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || fail 'The latest release has an unsupported version tag.'
-        version="${BASH_REMATCH[1]}"
-        printf 'Latest published version: %s.\n' "$version" >&2
+        release_versions=()
+        for candidate in "$release_directory"/Parchment-*.pkg; do
+            [[ -f "$candidate" ]] || continue
+            filename="${candidate##*/}"
+            if [[ "$filename" =~ ^Parchment-([0-9]+\.[0-9]+\.[0-9]+)-(arm64|x86_64|universal)\.pkg$ ]]; then
+                candidate_version="${BASH_REMATCH[1]}"
+                candidate_architecture="${BASH_REMATCH[2]}"
+                if [[ "$candidate_architecture" == "$architecture" || "$candidate_architecture" == universal ]]; then
+                    release_versions+=("$candidate_version")
+                fi
+            fi
+        done
+        [[ "${#release_versions[@]}" -gt 0 ]] || fail "No local installers for $architecture found in $release_directory. Build one with bash scripts/build-installer.sh, or supply --package PATH."
+        version="$(printf '%s\n' "${release_versions[@]}" | LC_ALL=C sort -t . -k1,1n -k2,2n -k3,3n | tail -n 1)"
+        printf 'Latest local version: %s.\n' "$version" >&2
     fi
-    local_package="$script_directory/../dist/Parchment-$version-$architecture.pkg"
-    if [[ -f "$local_package" ]]; then
-        package="$local_package"
-    elif [[ -f "$script_directory/../dist/Parchment-$version-universal.pkg" ]]; then
-        package="$script_directory/../dist/Parchment-$version-universal.pkg"
+    if [[ -f "$release_directory/Parchment-$version-$architecture.pkg" ]]; then
+        package="$release_directory/Parchment-$version-$architecture.pkg"
+    elif [[ -f "$release_directory/Parchment-$version-universal.pkg" ]]; then
+        package="$release_directory/Parchment-$version-universal.pkg"
+    else
+        fail "No local installer for $version ($architecture) in $release_directory. Build it with bash scripts/build-installer.sh, or supply --package PATH."
     fi
-    if [[ -n "$package" ]]; then printf 'Using the local installer for version %s.\n' "$version" >&2; fi
+    printf 'Using the local installer for version %s.\n' "$version" >&2
 fi
-if [[ -z "$package" ]]; then
-    package_name="Parchment-$version-$architecture.pkg"
-    release_url="https://github.com/prashantjois/parchment/releases/download/v$version"
-    printf 'Downloading %s…\n' "$package_name" >&2
-    download "$release_url/$package_name" "$temporary_directory/$package_name" || fail "No published installer for $version ($architecture). Build this checkout with bash scripts/build-installer.sh or select a published version with --version."
-    download "$release_url/$package_name.sha256" "$temporary_directory/$package_name.sha256"
-    package="$temporary_directory/$package_name"
-else
-    [[ -f "$package" && "$package" == *.pkg ]] || fail "Installer not found: $package."
-    [[ -f "$package.sha256" ]] || fail "Checksum file not found: $package.sha256."
-    package_name="$(basename "$package")"
-    cp "$package" "$temporary_directory/$package_name"
-    cp "$package.sha256" "$temporary_directory/$package_name.sha256"
-    package="$temporary_directory/$package_name"
-fi
+[[ -f "$package" && "$package" == *.pkg ]] || fail "Installer not found: $package."
+[[ -f "$package.sha256" ]] || fail "Checksum file not found: $package.sha256."
+package_name="$(basename "$package")"
+cp "$package" "$temporary_directory/$package_name"
+cp "$package.sha256" "$temporary_directory/$package_name.sha256"
+package="$temporary_directory/$package_name"
 
 # Accept exactly one checksum for this package; never follow paths from a manifest.
 checksum="$(cat "$package.sha256")"

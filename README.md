@@ -37,11 +37,11 @@ From this checkout, run:
 bash scripts/install.sh
 ```
 
-The script first asks which version to install. Press Enter for `latest`, or enter a version such as `0.1.26`. The default always selects the latest published GitHub Release, including from a source checkout.
+The script first asks which local version to install. Press Enter for `latest`, or enter a version such as `0.1.27`. The default selects the highest numeric version among compatible installers in this checkout’s `dist/` folder.
 
-The script reuses a matching installer in `dist/` when available. Otherwise, it downloads the selected version. If that version is unpublished and has no local installer, installation stops. Build it with `bash scripts/build-installer.sh`, then select that version explicitly or supply its package path.
+The script accepts packages for this Mac’s architecture or universal builds. If both exist for a version, the architecture-specific package takes priority. Missing packages or invalid checksums stop installation. Version selection and installation use local files.
 
-Use `--version VERSION` or `--package PATH` to skip the version question. If the release lookup is unavailable, use an explicit version with a matching local installer, or supply its package path.
+If no local installer is available, run `bash scripts/build-installer.sh`. Use `--version VERSION` or `--package PATH` to skip the version question. A standalone script can install a package supplied with `--package PATH`.
 
 The script verifies the package checksum before installation. It runs macOS's command-line installer with the same setup actions as the graphical installer. Only the installation step requests administrator access. Run the script without `sudo`.
 
@@ -81,10 +81,10 @@ bash scripts/install.sh --yes --skip-skill --markdown-default
 To install a local build, keep its `.pkg.sha256` file beside the package and run:
 
 ```sh
-bash scripts/install.sh --package dist/Parchment-0.1.26-arm64.pkg
+bash scripts/install.sh --package dist/Parchment-0.1.27-arm64.pkg
 ```
 
-Use `--version 0.1.26` to select that version, or `--version latest` to select the latest published release. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
+Use `--version 0.1.27` to select that local version, or `--version latest` to select the newest compatible local installer. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
 
 ### Build from source
 

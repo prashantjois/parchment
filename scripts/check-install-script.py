@@ -2,8 +2,6 @@
 """Exercise the install script against a real package without installing it."""
 import hashlib
 import itertools
-import json
-import shlex
 import os
 from pathlib import Path
 import plistlib
@@ -108,96 +106,96 @@ assert run('--help').returncode == 0
 print('PASS help and invalid arguments without administrator access')
 
 with tempfile.TemporaryDirectory(prefix='parchment-checkout-install-') as temporary:
-    checkout = Path(temporary)
-    (checkout / 'scripts').mkdir()
-    (checkout / 'dist').mkdir()
+    checkout = Path(temporary) / 'checkout with spaces'
+    (checkout / 'scripts').mkdir(parents=True)
+    releases = checkout / 'dist'
+    releases.mkdir()
     (checkout / 'Package.swift').write_text('// Source checkout fixture\n')
-    local_script = checkout / 'scripts/install.sh'
-    # Mock only HTTP in the copied script. Choices still use the real macOS installer.
-    mock_curl = checkout / 'curl-fixture.py'
-    mock_curl.write_text("#!" + sys.executable + "\n" + r'''import hashlib, json, os, pathlib, sys
-args = sys.argv[1:]
-with open(os.environ['CURL_TRACE'], 'a') as stream:
-    stream.write(json.dumps(args) + '\n')
-if '--head' in args:
-    if os.environ.get('CURL_OFFLINE') == '1': sys.exit(22)
-    print('https://github.com/prashantjois/parchment/releases/tag/v' + os.environ['PUBLISHED_VERSION'], end='')
-    sys.exit(0)
-if os.environ.get('ALLOW_DOWNLOAD') != '1': sys.exit(22)
-destination = pathlib.Path(args[args.index('--output') + 1])
-content = pathlib.Path(os.environ['PACKAGE_FIXTURE']).read_bytes()
-if args[-1].endswith('.sha256'):
-    name = destination.name.removesuffix('.sha256')
-    destination.write_text(hashlib.sha256(content).hexdigest() + '  ' + name + '\n')
-else:
-    destination.write_bytes(content)
-''')
-    mock_curl.chmod(0o755)
-    local_script.write_text(script.read_text().replace('/usr/bin/curl', shlex.quote(str(mock_curl))))
-    parts = package.stem.split('-')
-    version, architecture = parts[1:]
+    # Package files determine available versions, not source metadata.
     (checkout / 'scripts/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': '99.0.0'}))
-    local_package = checkout / 'dist' / package.name
-    shutil.copyfile(package, local_package)
-    shutil.copyfile(str(package) + '.sha256', str(local_package) + '.sha256')
-    (checkout / 'dist/Parchment-0.0.1-arm64.pkg').write_bytes(b'Older build: never select this file')
-    trace = checkout / 'curl-trace.jsonl'
-    env = dict(os.environ, CURL_TRACE=str(trace), PUBLISHED_VERSION=version, PACKAGE_FIXTURE=str(package))
+    local_script = checkout / 'scripts/install.sh'
+    shutil.copyfile(script, local_script)
+    version, architecture = package.stem.split('-')[1:]
+    other_architecture = 'x86_64' if architecture == 'arm64' else 'arm64'
 
-    def selected(*arguments, environment=None):
-        return subprocess.run(['bash', str(local_script), '--yes', '--dry-run', *arguments], cwd='/',
-                              env=environment or env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    def local_package(selected_version, selected_architecture=architecture):
+        target = releases / f'Parchment-{selected_version}-{selected_architecture}.pkg'
+        shutil.copyfile(package, target)
+        Path(str(target) + '.sha256').write_text(hashlib.sha256(target.read_bytes()).hexdigest() + '  ' + target.name + '\n')
+        return target
+
+    local = local_package(version)
+    (releases / 'Parchment-0.0.1-arm64.pkg').write_bytes(b'Older build: never select by filename order')
+    local_package('99.0.0', other_architecture)
+    (releases / 'Parchment-not-a-version-universal.pkg').write_bytes(b'Ignore unrelated files')
+
+    def selected(*arguments, path=local_script):
+        return subprocess.run(['bash', str(path), '--yes', '--dry-run', *arguments], cwd='/',
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
 
     result = selected()
     assert result.returncode == 0, result.stderr
-    assert 'Latest published version: ' + version in result.stderr
-    assert 'Using the local installer for version ' + version in result.stderr
-    assert 'Verified ' + package.name in result.stderr and 'Downloading' not in result.stderr
+    assert 'Latest local version: ' + version in result.stderr
+    assert 'Verified ' + package.name in result.stderr
     assert selected_choices(result.stdout) == {'parchment': 1, 'skill': 1, 'scheme': 1, 'default': 1}
-    code, output, errors = interactive('\n\n\n\n', script_path=local_script, package_path=None, env=env)
-    assert code == 0 and 'Version to install [latest]' in errors, errors
-    assert selected_choices(output)['default'] == 1 and 'Verified ' + package.name in errors
-    code, output, errors = interactive('invalid\nv' + version + '\n\n\n\n', script_path=local_script, package_path=None, env=env)
+    result = selected('--version', 'latest')
+    assert result.returncode == 0 and 'Latest local version: ' + version in result.stderr
+    code, output, errors = interactive('\n\n\n\n', script_path=local_script, package_path=None)
+    assert code == 0 and 'Version to install [latest]' in errors and 'Verified ' + package.name in errors, errors
+    assert selected_choices(output)['default'] == 1
+    code, output, errors = interactive('invalid\nv' + version + '\n\n\n\n', script_path=local_script, package_path=None)
     assert code == 0 and 'Enter a version such as' in errors and 'Verified ' + package.name in errors, errors
-    code, output, errors = interactive('\x04', script_path=local_script, package_path=None, env=env)
+    code, output, errors = interactive('\x04', script_path=local_script, package_path=None)
     assert code != 0 and 'Input ended; installation cancelled' in errors
-    print('PASS version prompt, Enter/latest defaults, explicit version input, invalid input, and version-prompt EOF')
+    print('PASS local latest, explicit latest, prompt defaults, invalid input, EOF, spaces, and working-directory independence')
 
-    before = trace.read_text()
-    result = selected('--version', version)
-    assert result.returncode == 0 and trace.read_text() == before, result.stderr
-    result = selected(environment=dict(env, CURL_OFFLINE='1'))
-    assert result.returncode != 0 and 'Could not find the latest published version' in result.stderr
-    result = selected('--version', version, environment=dict(env, CURL_OFFLINE='1'))
-    assert result.returncode == 0, result.stderr
-    result = selected(environment=dict(env, PUBLISHED_VERSION='../bad'))
-    assert result.returncode != 0 and 'unsupported version tag' in result.stderr
-    print('PASS explicit local versions work offline; latest requires a valid published release and ignores newer checkout metadata')
+    for selected_version in ['1.9.9', '1.10.0']:
+        local_package(selected_version)
+    result = selected()
+    assert result.returncode == 0 and 'Latest local version: 1.10.0' in result.stderr, result.stderr
+    for selected_version in ['1.10.9', '1.10.10']:
+        local_package(selected_version)
+    result = selected()
+    assert result.returncode == 0 and 'Latest local version: 1.10.10' in result.stderr, result.stderr
+    for selected_version in ['1.99.99', '2.0.0']:
+        local_package(selected_version)
+    result = selected()
+    assert result.returncode == 0 and 'Latest local version: 2.0.0' in result.stderr, result.stderr
+    result = selected('--version', '1.10.0')
+    assert result.returncode == 0 and 'Verified Parchment-1.10.0-' in result.stderr
+    code, output, errors = interactive('1.9.9\n\n\n\n', script_path=local_script, package_path=None)
+    assert code == 0 and 'Verified Parchment-1.9.9-' in errors, errors
+    print('PASS numeric major/minor/patch ordering and selection of older local versions')
 
-    release_env = dict(env, PUBLISHED_VERSION='0.1.100', ALLOW_DOWNLOAD='1')
-    result = selected(environment=release_env)
-    assert result.returncode == 0, result.stderr
-    assert 'Latest published version: 0.1.100' in result.stderr
-    assert 'Downloading Parchment-0.1.100-' + architecture in result.stderr
-    code, output, errors = interactive('0.1.100\n\n\n\n', script_path=local_script, package_path=None,
-                                       env=dict(env, ALLOW_DOWNLOAD='1'))
-    assert code == 0 and 'Downloading Parchment-0.1.100-' + architecture in errors, errors
-    standalone = checkout / 'standalone/install.sh'
-    standalone.parent.mkdir()
-    shutil.copyfile(local_script, standalone)
-    result = subprocess.run(['bash', str(standalone), '--yes', '--dry-run'], env=release_env,
-                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0 and 'Latest published version: 0.1.100' in result.stderr, result.stderr
-    result = subprocess.run(['bash', str(standalone), '--yes', '--dry-run'], env=dict(env, CURL_OFFLINE='1'),
-                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-    assert result.returncode != 0 and 'Could not find the latest published version' in result.stderr
-    print('PASS newer published versions, explicit release selection, standalone latest selection, and standalone offline failure')
+    universal = local_package('3.0.0', 'universal')
+    result = selected()
+    assert result.returncode == 0 and 'Verified ' + universal.name in result.stderr, result.stderr
+    native = local_package('3.0.0')
+    result = selected()
+    assert result.returncode == 0 and 'Verified ' + native.name in result.stderr, result.stderr
+    print('PASS newer universal packages, native preference at the same version, and incompatible-architecture exclusion')
 
-    Path(str(local_package) + '.sha256').unlink()
+    checksum = Path(str(native) + '.sha256')
+    valid_checksum = checksum.read_text()
+    checksum.unlink()
     result = selected()
     assert result.returncode != 0 and 'Checksum file not found' in result.stderr
-    local_package.unlink()
+    checksum.write_text(valid_checksum)
+    native.write_bytes(native.read_bytes() + b'tampered')
     result = selected()
-    assert result.returncode != 0 and 'No published installer for ' + version in result.stderr
-    assert 'Downloading Parchment-0.0.1-' not in result.stderr
-print('PASS selected versions fail on missing checksums or unavailable installers without falling back to a different version')
+    assert result.returncode != 0 and 'checksum mismatch' in result.stderr
+    result = selected('--version', '88.0.0')
+    assert result.returncode != 0 and 'No local installer for 88.0.0' in result.stderr
+    print('PASS the newest missing checksum, a corrupt package, and unavailable explicit versions fail without fallback')
+
+    standalone = checkout / 'standalone/scripts/install.sh'
+    standalone.parent.mkdir(parents=True)
+    shutil.copyfile(script, standalone)
+    result = selected(path=standalone)
+    assert result.returncode != 0 and 'No local installers' in result.stderr
+    result = selected('--package', str(package), path=standalone)
+    assert result.returncode == 0, result.stderr
+    for path in releases.iterdir(): path.unlink()
+    result = selected()
+    assert result.returncode != 0 and 'No local installers' in result.stderr
+    print('PASS empty local release folders and standalone copies require an explicit package instead of accessing GitHub')
