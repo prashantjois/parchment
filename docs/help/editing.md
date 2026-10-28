@@ -10,6 +10,8 @@ Right-click a tab for **Add File Comment**, **Close Tab**, **Close Tabs Before**
 
 Raw mode provides native text editing, selection, cut/copy/paste, undo/redo, find and replace, spelling, formatting shortcuts, and automatic list continuation. Tab and Shift-Tab indent and outdent selected lines. `⌘⌥]` and `⌘⌥[` also change indentation. Rendered mode is a read-only preview. Split mode shows both views with proportional scroll synchronization. The preview updates about 180 milliseconds after a typing pause. Rendered content fills the pane width with 16-pixel side margins by default.
 
+Raw has a minimum width of 400 points. Rendered has a minimum width of 480 points. If the window or sidebars leave less space, the editor area scrolls horizontally. Use the horizontal scrollbar, scroll sideways on a trackpad, or use Shift with the mouse wheel. Sidebars remain in place. The split divider stops at each pane's minimum width. Code blocks and tables retain their own horizontal scrolling.
+
 The file browser starts in the current file's folder. An unsaved document starts in the user's home folder. The browser supports expandable folders and parent navigation.
 
 In Rendered and Split modes, clicking a local file link opens or selects its tab in Rendered mode. External parchment:// document links also select Rendered mode. Links preserve live edits even when the target tab was open in Raw or Split mode. Heading fragments navigate to the heading in the target file. Folder links open the file browser. Web links open in the system's default browser.

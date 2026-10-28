@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.21 | 22 | 2026-10-27 | Current release | Shortened tooltips to a 300 ms delay and removed hover highlight animation. |
+| 0.1.22 | 23 | 2026-10-27 | Current release | Added minimum pane widths and horizontal editor scrolling to prevent compressed content. |
+| 0.1.21 | 22 | 2026-10-27 | `7b8f8b8` | Shortened tooltips to a 300 ms delay and removed hover highlight animation. |
 | 0.1.20 | 21 | 2026-10-27 | `aafbd4c` | Added consistent hover highlights and action tooltips to app buttons. |
 | 0.1.19 | 20 | 2026-10-27 | `0623819` | Added Add File Comment to the tab context menu. |
 | 0.1.18 | 19 | 2026-10-27 | `0b10bb2` | Document links select Rendered mode; terminal-link guidance now describes client limitations. |
@@ -26,6 +27,15 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.22
+
+- Raw panes have a 400-point minimum width. Rendered panes have a 480-point minimum width in split and single-pane modes.
+- The editor area scrolls horizontally when the available width is smaller than its content. Sidebars remain fixed.
+- Horizontal trackpad gestures and Shift-wheel scrolling work over Raw and Rendered panes.
+- Code blocks and tables keep their own horizontal scrolling and hand off at their edges.
+- The split divider respects both pane minimums. Wider windows remove excess horizontal overflow.
+- Native scrollbar layout supports both overlay and always-visible scrollbars without clipping the bottom of either pane.
 
 ## 0.1.21
 

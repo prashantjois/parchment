@@ -85,6 +85,12 @@ final class MarkdownTextView: NSTextView {
 }
 
 final class EditorScrollView: NSScrollView {
+    override func scrollWheel(with event: NSEvent) {
+        if let viewport = EditorViewportScrollView.containing(self), viewport.hasHorizontalOverflow,
+           let delta = EditorViewportScrollView.horizontalDelta(for: event) {
+            viewport.scrollHorizontally(by: delta)
+        } else { super.scrollWheel(with: event) }
+    }
     override func tile() {
         super.tile()
         guard let text = documentView as? NSTextView else { return }

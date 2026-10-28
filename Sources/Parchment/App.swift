@@ -14,6 +14,7 @@ import ParchmentCore
         if CommandLine.arguments.contains("--check-storage") { StorageChecks.run() }
         if CommandLine.arguments.contains("--check-editor") { EditorChecks.run() }
         if CommandLine.arguments.contains("--check-tabs") { TabChecks.run() }
+        if CommandLine.arguments.contains("--check-panes") { PaneLayoutChecks.run() }
         if let index = CommandLine.arguments.firstIndex(of: "--export-comments") {
             guard CommandLine.arguments.count > index + 1 else { fputs("Usage: Parchment --export-comments FILE [--include-resolved]\n", stderr); exit(2) }
             do {
@@ -261,17 +262,28 @@ struct DocumentWorkspace: View {
             }
         }
     }
-    @ViewBuilder var editor: some View {
-        if document.layout.mode == .split {
-            GeometryReader { geometry in
+    var editor: some View {
+        GeometryReader { geometry in
+            let layout = EditorPaneLayout(viewportWidth: geometry.size.width, mode: document.layout.mode,
+                                          splitFraction: document.layout.splitFraction)
+            EditorViewport(contentWidth: layout.width) {
                 HStack(spacing: 0) {
-                    SourcePane(document: document, beginComment: workspace.beginComment).frame(width: max(120, (geometry.size.width - 8) * document.layout.splitFraction))
-                    ResizeHandle(value: $document.layout.splitFraction, limits: 0.2...0.8, scale: max(1, geometry.size.width - 8))
-                    RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment)
-                }
+                    if document.layout.mode != .rendered {
+                        SourcePane(document: document, beginComment: workspace.beginComment).frame(width: layout.rawWidth)
+                    }
+                    if document.layout.mode == .split {
+                        ResizeHandle(value: Binding(get: { Double(layout.rawWidth / layout.paneWidth) },
+                                                    set: { document.layout.splitFraction = $0 }),
+                                     limits: layout.splitLimits, scale: layout.paneWidth)
+                            .allowsHitTesting(layout.splitLimits.upperBound - layout.splitLimits.lowerBound > 0.0001)
+                    }
+                    if document.layout.mode != .raw {
+                        RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL,
+                                     beginComment: workspace.beginComment).frame(width: layout.renderedWidth)
+                    }
+                }.frame(width: layout.width).frame(maxHeight: .infinity)
             }
-        } else if document.layout.mode == .raw { SourcePane(document: document, beginComment: workspace.beginComment) }
-        else { RenderedPane(document: document, themes: workspace.themes, openDocument: workspace.openIncomingURL, beginComment: workspace.beginComment) }
+        }
     }
     func toolbarButton(_ title: String, icon: String, shortcut: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) { Label(title, systemImage: icon).foregroundStyle(active ? Color.accentColor : Color.primary) }.buttonFeedback("\(title) (\(shortcut))")

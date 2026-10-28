@@ -9,6 +9,22 @@ final class PreviewWebView: WKWebView, NSMenuItemValidation {
     var remoteImageAction: ((String, Bool) -> Void)?
     private var remoteImageSource = ""
     let selectionPopover = SelectionCommentPopover()
+    override func scrollWheel(with event: NSEvent) {
+        guard let viewport = EditorViewportScrollView.containing(self), viewport.hasHorizontalOverflow,
+              let delta = EditorViewportScrollView.horizontalDelta(for: event) else {
+            super.scrollWheel(with: event); return
+        }
+        let point = convert(event.locationInWindow, from: nil)
+        let y = isFlipped ? point.y : bounds.height - point.y
+        // Let code blocks and tables consume their own horizontal scrolling first.
+        evaluateJavaScript("canScrollHorizontallyAtPoint(\(point.x), \(y), \(delta))") { [weak self, weak viewport] result, error in
+            guard let self else { return }
+            if error != nil || result as? Bool == true || viewport?.hasHorizontalOverflow != true {
+                self.scrollWebContent(with: event)
+            } else { viewport?.scrollHorizontally(by: delta) }
+        }
+    }
+    private func scrollWebContent(with event: NSEvent) { super.scrollWheel(with: event) }
     func showRemoteImageMenu(source: String, at point: NSPoint) {
         remoteImageSource = source
         let menu = NSMenu()
@@ -192,6 +208,15 @@ struct RenderedPane: NSViewRepresentable {
     }
     static let script = #"""
     const send = value => window.webkit.messageHandlers.parchment.postMessage(value);
+    function canScrollHorizontallyAtPoint(x, y, delta) {
+      for (let node = document.elementFromPoint(x, y); node; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowX;
+        if (!['auto', 'scroll', 'overlay'].includes(overflow) || node.scrollWidth <= node.clientWidth + 1) continue;
+        const maximum = node.scrollWidth - node.clientWidth;
+        if ((delta > 0 && node.scrollLeft < maximum - 1) || (delta < 0 && node.scrollLeft > 1)) return true;
+      }
+      return false;
+    }
     function setRemoteImages(policy) {
       const allowed = new Set(policy.sources);
       for (const element of document.querySelectorAll('[data-remote-src]')) {
