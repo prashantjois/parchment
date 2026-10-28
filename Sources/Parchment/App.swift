@@ -41,13 +41,7 @@ import ParchmentCore
         .defaultSize(width: 1240, height: 820)
         .windowToolbarStyle(.unified)
         .commands {
-            CommandGroup(replacing: .newItem) {
-                Button("New Tab") { workspace.newDocument() }.keyboardShortcut("n")
-                Button("Open…") { workspace.openPanel() }.keyboardShortcut("o")
-                Menu("Open Recent") {
-                    ForEach(NSDocumentController.shared.recentDocumentURLs.filter { FileManager.default.fileExists(atPath: $0.path) }, id: \.self) { url in Button(url.lastPathComponent) { workspace.open(url) } }
-                }
-            }
+            FileOpeningCommands(newDocument: workspace.newDocument, openPanel: workspace.openPanel)
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { if let doc = workspace.active { workspace.save(doc) } }.keyboardShortcut("s").disabled(workspace.active == nil)
                 Button("Save As…") { if let doc = workspace.active { workspace.save(doc, saveAs: true) } }.keyboardShortcut("s", modifiers: [.command, .shift]).disabled(workspace.active == nil)
@@ -111,6 +105,7 @@ struct AppSettings: View {
     var body: some View {
         TabView {
             Form {
+                AppearancePicker(library: themes)
                 Toggle("Automatically load remote images", isOn: $loadRemoteImages)
                     .help("Load remote images automatically in every document")
                 Text("When disabled, right-click a remote image placeholder to load that image or enable automatic loading.")
@@ -123,6 +118,7 @@ struct AppSettings: View {
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var workspace: Workspace?
+    private var recentMenuController: RecentDocumentsMenuController?
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleOpenURL(_:withReplyEvent:)), forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
     }
@@ -131,7 +127,12 @@ struct AppSettings: View {
               let url = URL(string: value) else { return }
         application(NSApplication.shared, open: [url])
     }
-    func applicationDidFinishLaunching(_ notification: Notification) { NSApp.setActivationPolicy(.regular) }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        if let workspace = Self.workspace {
+            recentMenuController = RecentDocumentsMenuController(recentDocuments: workspace.recentDocuments, open: workspace.open)
+        }
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationWillTerminate(_ notification: Notification) { Self.workspace?.integration?.stop() }
     func application(_ application: NSApplication, open urls: [URL]) {

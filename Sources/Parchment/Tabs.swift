@@ -59,7 +59,7 @@ struct DocumentTab: View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
             Text(document.title).font(.system(size: 12, weight: selected ? .semibold : .regular)).lineLimit(1)
-                .background(TabCommentHover(action: comment))
+                .background(TabCommentHover(action: comment).frame(height: 38))
                 .help(document.url?.path ?? "Unsaved document")
             if document.isDirty { Circle().fill(.secondary).frame(width: 5, height: 5) }
             Button(action: comment) { Image(systemName: "text.bubble").font(.system(size: 11)).padding(3) }

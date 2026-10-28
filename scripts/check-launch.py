@@ -30,8 +30,15 @@ with tempfile.TemporaryDirectory(prefix="parchment-launch-") as temporary:
         pid = int(launch.stdout.strip())
         def matches_document(item):
             return item["path"] is not None and os.path.samefile(item["path"], document)
+        listing = {"documents": []}
         for _ in range(100):
-            listing = helper.tool("list_documents")
+            response = helper.request("tools/call", {"name": "list_documents", "arguments": {}})
+            payload = json.loads(response["content"][0]["text"])
+            if response.get("isError"):
+                assert payload["code"] == "APP_UNAVAILABLE", response
+                time.sleep(0.1)
+                continue
+            listing = payload
             if any(matches_document(item) for item in listing["documents"]):
                 break
             time.sleep(0.1)

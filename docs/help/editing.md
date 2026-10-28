@@ -1,6 +1,10 @@
 # Editing guide
 
-Each file opens in a tab. An already open file activates its existing tab. Each file remembers its view mode, sidebar widths, split divider, cursor, and scroll position.
+Each file opens in a tab. An already open file activates its existing tab. Each file remembers its view mode, sidebar widths, split divider, cursor, and scroll position. The tab-name hover prompt appears below the tab.
+
+**File → Open Recent** lists up to 20 available files, with the most recent file first. The list updates when you open or save a file and survives app restarts. Existing saved tabs populate the list after an upgrade. Use **Clear Menu** to erase the list.
+
+In **Settings → General**, set **Appearance** to **System**, **Light**, or **Dark**. The same control is available in **Themes**. The choice applies to the whole app and survives a restart. **System** follows the macOS appearance.
 
 Hover over an enabled button to see its highlight immediately. Pause for about 0.3 seconds to see a tooltip with its action and available shortcut. This feedback covers toolbar buttons, tab icons, sidebar actions, comments, reviews, and theme controls. Disabled buttons remain unhighlighted.
 

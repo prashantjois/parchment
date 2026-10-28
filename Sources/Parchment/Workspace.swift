@@ -266,15 +266,17 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     private var recoveryTask: Task<Void, Never>?
     private var canPersistRecovery = true
     private let support: URL
-    private let recordsRecentDocuments: Bool
+    let recentDocuments: RecentDocuments
     var active: EditorDocument? { documents.first { $0.id == activeID } }
 
     init(recoveryDirectory: URL? = nil) {
-        recordsRecentDocuments = recoveryDirectory == nil
         support = recoveryDirectory ?? IntegrationPaths.directory
+        recentDocuments = RecentDocuments(storageURL: support.appendingPathComponent("recent-documents.json"),
+                                          recordsSystemRecents: recoveryDirectory == nil)
         do { try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true) }
         catch { self.error = "Cannot create the recovery folder: \(error.localizedDescription)" }
         restore()
+        recentDocuments.seedFromSession(([active?.url].compactMap { $0 }) + documents.compactMap(\.url))
         if documents.isEmpty { newDocument() }
         recordsNavigation = true
     }
@@ -303,7 +305,9 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     }
     private func openWithoutHistory(_ url: URL) {
         let url = url.standardizedFileURL.resolvingSymlinksInPath()
-        if let document = documents.first(where: { $0.url == url }) { activeID = document.id; return }
+        if let document = documents.first(where: { $0.url == url }) {
+            activeID = document.id; recentDocuments.note(url); return
+        }
         do {
             let text = try String(contentsOf: url, encoding: .utf8)
             let comments = try CommentFile.read(for: url)
@@ -311,7 +315,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
             if let data = UserDefaults.standard.data(forKey: "layout:\(url.path)"), let saved = try? JSONDecoder().decode(FileLayout.self, from: data) { layout = saved }
             let id = try integration?.canonicalID(for: url, comments: comments)
             attach(EditorDocument(id: id, url: url, text: text, layout: layout, comments: comments))
-            if recordsRecentDocuments { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
+            recentDocuments.note(url)
             scheduleRecovery()
         } catch { self.error = "Cannot open \(url.lastPathComponent): \(error.localizedDescription)" }
     }
@@ -374,6 +378,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
                 guard alert.runModal() == .alertFirstButtonReturn else { return }
             }
             try document.save(to: destination, overwriteExternalChanges: true)
+            if let url = document.url { recentDocuments.note(url) }
             if activeID == oldID { activeID = document.id }
             scheduleRecovery()
         }

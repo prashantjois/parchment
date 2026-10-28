@@ -47,13 +47,15 @@ private final class CommentPopoverBackground: NSVisualEffectView {
         let work = DispatchWorkItem { [weak self, weak view] in
             guard let self, let view, let window = view.window, window.isKeyWindow,
                   window.attachedSheet == nil, window.sheetParent == nil, NSEvent.pressedMouseButtons == 0 else { return }
-            let anchor = rect.intersection(view.visibleRect)
+            var anchor = rect.intersection(view.visibleRect)
             guard !anchor.isEmpty else { self.hide(); return }
+            if followsHover { anchor.origin.y = rect.minY; anchor.size.height = rect.height }
             let screenRect = window.convertToScreen(view.convert(anchor, to: nil))
             let screen = window.screen?.visibleFrame ?? screenRect.insetBy(dx: -200, dy: -200)
             let size = self.panel.frame.size
             let x = min(max(screenRect.midX - size.width / 2, screen.minX + 8), screen.maxX - size.width - 8)
-            let y = screenRect.maxY + size.height + 6 < screen.maxY ? screenRect.maxY + 6 : screenRect.minY - size.height - 6
+            let below = screenRect.minY - size.height - 6
+            let y = followsHover ? below : (screenRect.maxY + size.height + 6 < screen.maxY ? screenRect.maxY + 6 : below)
             self.action = action
             if self.panel.parent !== window {
                 self.panel.parent?.removeChildWindow(self.panel)

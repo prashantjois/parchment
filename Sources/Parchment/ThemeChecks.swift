@@ -15,6 +15,7 @@ import ParchmentCore
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
         let runner = ThemeChecks(); active = runner
+        runner.checkApplicationAppearance()
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(runner, name: "parchment")
         runner.web = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), configuration: configuration)
@@ -25,6 +26,35 @@ import ParchmentCore
         exit(1)
     }
     var builtins: [EditorTheme] { library.items.filter { !$0.custom } }
+    func checkApplicationAppearance() {
+        let domain = "parchment-appearance-check-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        let original = NSApp.appearance
+        defer { NSApp.appearance = original; defaults.removePersistentDomain(forName: domain) }
+        func expect(_ condition: Bool, _ label: String) {
+            print("\(condition ? "PASS" : "FAIL") \(label)")
+            if !condition { failures += 1 }
+        }
+        let model = ThemeLibrary(defaults: defaults)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        expect(model.appearance == "system" && NSApp.appearance == nil, "the app defaults to the system appearance")
+        model.appearance = "light"
+        expect(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua,
+               "Light changes the native window appearance")
+        model.appearance = "dark"
+        expect(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua,
+               "Dark changes the native window appearance")
+        let restored = ThemeLibrary(defaults: defaults)
+        expect(restored.appearance == "dark" && NSApp.appearance?.name == .darkAqua,
+               "the app restores the saved appearance on startup")
+        restored.appearance = "system"
+        expect(NSApp.appearance == nil && window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) ==
+               NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]),
+               "System clears the override and follows macOS again")
+    }
     func next() {
         guard index < builtins.count else {
             print("\(builtins.count * 2) WebKit theme/appearance checks, \(failures) failures")

@@ -17,6 +17,7 @@ import ParchmentCore
             try "# Second\n".write(to: second, atomically: true, encoding: .utf8)
             let workspace = Workspace(recoveryDirectory: recovery)
             workspace.open(first)
+            check(workspace.recentDocuments.urls == [first], "opening a file immediately populates Open Recent")
             let firstDocument = workspace.active!
             firstDocument.layout.showFiles = true; firstDocument.layout.mode = .split
             firstDocument.layout.previousSingleMode = .rendered; firstDocument.layout.rightWidth = 333
@@ -50,12 +51,45 @@ import ParchmentCore
             check(ordering.visibleCommentThreads(filter: "Unread").count == 2, "mark as unread restores a previously read thread")
             UserDefaults.standard.removeObject(forKey: "comments.read:\(ordering.id.uuidString)")
             workspace.open(second); let secondDocument = workspace.active!
+            check(workspace.recentDocuments.urls == [second, first], "Open Recent lists the newest file first")
             check(secondDocument.layout.mode == .raw && !secondDocument.layout.showFiles, "tabs have independent layouts")
             let count = workspace.documents.count
             workspace.open(first)
+            check(workspace.recentDocuments.urls == [first, second], "reopening an existing tab refreshes Open Recent without duplicates")
             check(workspace.active?.id == firstDocument.id && workspace.documents.count == count, "opening an existing file reuses its tab")
             check(workspace.persist(), "session persists")
             let restored = Workspace(recoveryDirectory: recovery)
+            check(restored.recentDocuments.urls == [first, second], "recent files survive session restart")
+            let storedRecents = recovery.appendingPathComponent("recent-documents.json")
+            try FileManager.default.removeItem(at: storedRecents)
+            let migrated = Workspace(recoveryDirectory: recovery)
+            check(migrated.recentDocuments.urls.first == first && migrated.recentDocuments.urls.contains(second),
+                  "existing saved tabs populate Open Recent when upgrading from an older build")
+            let app = NSApplication.shared
+            let previousMenu = app.mainMenu
+            let mainMenu = NSMenu(title: "Main"), fileMenu = NSMenu(title: "File")
+            let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+            fileItem.submenu = fileMenu; mainMenu.addItem(fileItem)
+            let recentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
+            recentItem.submenu = NSMenu(title: "Open Recent"); recentItem.isEnabled = false; fileMenu.addItem(recentItem)
+            app.mainMenu = mainMenu
+            var openedRecent: URL?
+            let recentController = RecentDocumentsMenuController(recentDocuments: migrated.recentDocuments, open: { openedRecent = $0 })
+            migrated.open(second)
+            NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: fileMenu)
+            check(recentItem.isEnabled && recentItem.submenu?.items.first?.title == "second.md",
+                  "the native Open Recent submenu refreshes and enables itself when File opens")
+            recentItem.submenu!.performActionForItem(at: 0)
+            check(openedRecent == second, "choosing a native recent-file item opens its file")
+            recentItem.submenu!.performActionForItem(at: recentItem.submenu!.items.count - 1)
+            check(migrated.recentDocuments.urls.isEmpty, "the native Clear Menu action erases recent files")
+            app.mainMenu = previousMenu
+            withExtendedLifetime(recentController) {}
+            let cleared = Workspace(recoveryDirectory: recovery)
+            check(cleared.recentDocuments.urls.isEmpty, "Clear Menu survives restart without reseeding restored tabs")
+            workspace.open(second)
+            workspace.save(firstDocument)
+            check(workspace.recentDocuments.urls.first == first, "an explicit save records the saved document in Open Recent")
             check(restored.active?.layout.rightWidth == 333 && restored.active?.layout.mode == .split, "session restores active tab and layout")
             check(restored.active?.comments.threads.first?.events.count == 4, "session restores reply and resolution history")
             workspace.openIncomingURL(try DocumentLink.url(for: second, line: 2))
@@ -87,6 +121,8 @@ import ParchmentCore
             check(draftRestored.active?.text == "An unsaved draft" && draftRestored.active?.url == nil, "unsaved draft survives restoration")
             try FileManager.default.removeItem(at: first)
             let missing = Workspace(recoveryDirectory: recovery)
+            check(!missing.recentDocuments.urls.contains(first) && missing.recentDocuments.urls.contains(second),
+                  "Open Recent omits missing files without losing available files")
             check(missing.documents.contains(where: { $0.url == nil && $0.text.contains("A sentence to review.") }) && missing.documents.contains(where: { $0.url == second }), "missing file recovers as a draft without losing other tabs")
             let corruptedDirectory = directory.appendingPathComponent("corrupt")
             try FileManager.default.createDirectory(at: corruptedDirectory, withIntermediateDirectories: true)

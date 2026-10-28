@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.24 | 25 | 2026-10-28 | Current release | Added separate, always-visible horizontal scrollbars for Raw and Rendered, unwrapped Raw lines, and readable wide tables. |
+| 0.1.25 | 26 | 2026-10-28 | Current release | Moved tab hover prompts below tabs, repaired Open Recent, and added app-wide System, Light, and Dark appearance. |
+| 0.1.24 | 25 | 2026-10-28 | `9339823` | Added separate, always-visible horizontal scrollbars for Raw and Rendered, unwrapped Raw lines, and readable wide tables. |
 | 0.1.23 | 24 | 2026-10-27 | `a7a9170` | Increased pane minimum widths, kept the horizontal scrollbar visible during overflow, and forwarded page-level WebKit wheel events. |
 | 0.1.22 | 23 | 2026-10-27 | `c56d8ab` | Added minimum pane widths and horizontal editor scrolling to prevent compressed content. |
 | 0.1.21 | 22 | 2026-10-27 | `7b8f8b8` | Shortened tooltips to a 300 ms delay and removed hover highlight animation. |
@@ -29,6 +30,15 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchment:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.25
+
+- Tab-name hover prompts appear below the full tab height so they do not cover toolbar buttons.
+- Open Recent saves up to 20 available files. Its native submenu refreshes each time it opens.
+- New opens, existing tabs, agent opens, and explicit saves update the recent-file list.
+- Existing saved tabs seed the list after an upgrade. Duplicate and missing files are omitted.
+- Clear Menu erases the saved list and remains clear after a restart.
+- Settings → General and Themes offer System, Light, and Dark appearance for the whole app. The choice persists across restarts.
 
 ## 0.1.24
 

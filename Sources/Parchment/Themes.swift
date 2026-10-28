@@ -12,12 +12,15 @@ struct EditorTheme: Identifiable {
 
 @MainActor final class ThemeLibrary: ObservableObject {
     @Published var items: [EditorTheme] = []
-    @Published var selectedID: String { didSet { UserDefaults.standard.set(selectedID, forKey: "theme") } }
-    @Published var appearance: String { didSet { UserDefaults.standard.set(appearance, forKey: "appearance") } }
-    @Published var fontSize: Double { didSet { UserDefaults.standard.set(fontSize, forKey: "fontSize") } }
-    @Published var customFont: String { didSet { UserDefaults.standard.set(customFont, forKey: "customFont") } }
-    @Published var lightText: String { didSet { UserDefaults.standard.set(lightText, forKey: "lightText") } }
-    @Published var darkText: String { didSet { UserDefaults.standard.set(darkText, forKey: "darkText") } }
+    @Published var selectedID: String { didSet { defaults.set(selectedID, forKey: "theme") } }
+    @Published var appearance: String {
+        didSet { defaults.set(appearance, forKey: "appearance"); applyAppearance() }
+    }
+    @Published var fontSize: Double { didSet { defaults.set(fontSize, forKey: "fontSize") } }
+    @Published var customFont: String { didSet { defaults.set(customFont, forKey: "customFont") } }
+    @Published var lightText: String { didSet { defaults.set(lightText, forKey: "lightText") } }
+    @Published var darkText: String { didSet { defaults.set(darkText, forKey: "darkText") } }
+    private let defaults: UserDefaults
     let baseCSS: String
     let customDirectory: URL
     var selected: EditorTheme? { items.first { $0.id == selectedID } ?? items.first }
@@ -25,8 +28,8 @@ struct EditorTheme: Identifiable {
         if let root = Bundle.main.resourceURL?.appendingPathComponent("themes"), FileManager.default.fileExists(atPath: root.path) { return root }
         return Bundle.module.resourceURL!.appendingPathComponent("themes")
     }
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         selectedID = defaults.string(forKey: "theme") ?? "parchment"
         appearance = defaults.string(forKey: "appearance") ?? "system"
         fontSize = defaults.double(forKey: "fontSize")
@@ -37,6 +40,14 @@ struct EditorTheme: Identifiable {
         customDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Parchment/Themes", isDirectory: true)
         try? FileManager.default.createDirectory(at: customDirectory, withIntermediateDirectories: true)
         reload()
+        applyAppearance()
+    }
+    private func applyAppearance() {
+        switch appearance {
+        case "light": NSApplication.shared.appearance = NSAppearance(named: .aqua)
+        case "dark": NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+        default: NSApplication.shared.appearance = nil
+        }
     }
     func reload() {
         let root = Self.bundledDirectory
@@ -91,9 +102,7 @@ struct ThemeSettings: View {
             HStack(alignment: .top, spacing: 20) {
                 Form {
                     Picker("Theme", selection: $library.selectedID) { ForEach(library.items) { Text($0.name).tag($0.id) } }.buttonFeedback("Choose the document theme")
-                    Picker("Appearance", selection: $library.appearance) {
-                        Text("Follow System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
-                    }.buttonFeedback("Choose system, light, or dark appearance")
+                    AppearancePicker(library: library)
                     HStack {
                         Text("Font size")
                         Stepper(library.fontSize == 0 ? "Theme default" : "\(Int(library.fontSize)) px", value: $library.fontSize, in: 0...40).help("Adjust the document font size. Zero uses the theme default.")
@@ -133,5 +142,14 @@ struct ThemeSettings: View {
         ThemeCSSValidator.validate(css) { result in
             switch result { case .success: error = nil; action(); case .failure(let failure): error = failure.localizedDescription }
         }
+    }
+}
+
+struct AppearancePicker: View {
+    @ObservedObject var library: ThemeLibrary
+    var body: some View {
+        Picker("Appearance", selection: $library.appearance) {
+            Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
+        }.pickerStyle(.segmented).buttonFeedback("Choose the appearance for the whole app")
     }
 }

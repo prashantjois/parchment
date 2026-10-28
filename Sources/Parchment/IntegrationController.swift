@@ -97,7 +97,9 @@ import ParchmentIntegration
         guard path.hasPrefix("/") || path.hasPrefix("~/") else { throw BridgeError("INVALID_PATH", "Use an absolute path or a path beginning with ~/.") }
         let url = URL(fileURLWithPath: IntegrationRegistry.canonicalPath(path))
         guard ["md", "markdown", "mdown", "txt"].contains(url.pathExtension.lowercased()) else { throw BridgeError("UNSUPPORTED_FILE", "Open a Markdown or plain-text file.") }
-        if let document = workspace.documents.first(where: { $0.url == url }) { workspace.activeID = document.id; return document }
+        if let document = workspace.documents.first(where: { $0.url == url }) {
+            workspace.activeID = document.id; workspace.recentDocuments.note(url); return document
+        }
         guard FileManager.default.isReadableFile(atPath: url.path) else { throw BridgeError("FILE_NOT_READABLE", "The requested file does not exist or cannot be read.") }
         // Preflight avoids an interactive alert in the tool path.
         _ = try String(contentsOf: url, encoding: .utf8); _ = try CommentFile.read(for: url)
