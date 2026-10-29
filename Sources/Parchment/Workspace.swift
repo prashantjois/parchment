@@ -317,6 +317,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
             let comments = try CommentFile.read(for: url)
             var layout = FileLayout()
             if let data = UserDefaults.standard.data(forKey: "layout:\(url.path)"), let saved = try? JSONDecoder().decode(FileLayout.self, from: data) { layout = saved }
+            layout.showSinglePane(.rendered)
             let id = try integration?.canonicalID(for: url, comments: comments)
             attach(EditorDocument(id: id, url: url, text: text, layout: layout, comments: comments))
             recentDocuments.note(url)

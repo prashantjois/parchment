@@ -171,7 +171,7 @@ def main():
             passed("agents can attach and edit unsaved tabs without a save dialog")
             opened = a.tool("open_document", {"path": str(document_path), "attach": True, "session_token": first["session_token"], "activate": False})
             doc_id = opened["document_id"]
-            assert opened["attachment"]["status"] == "attached"
+            assert opened["attachment"]["status"] == "attached" and opened["view_mode"] == "rendered"
             attachment = opened["binding"]
             auth = {key: attachment[key] for key in ("binding_id", "generation")}
             auth["session_token"] = first["session_token"]

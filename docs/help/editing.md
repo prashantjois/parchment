@@ -1,6 +1,6 @@
 # Editing guide
 
-Each file opens in a tab. An already open file activates its existing tab. Each file remembers its view mode, sidebar widths, split divider, cursor, and scroll position. The tab-name hover prompt appears below the tab.
+Each file opens in a tab in Rendered mode, even if it was previously closed in Raw or Split mode. An already open file activates its existing tab. Each file remembers its sidebar widths, split divider, cursor, and scroll position. Existing tabs and session recovery retain the selected view mode. The tab-name hover prompt appears below the tab.
 
 **File → Open Recent** lists up to 20 available files, with the most recent file first. The list updates when you open or save a file and survives app restarts. Existing saved tabs populate the list after an upgrade. Use **Clear Menu** to erase the list.
 

@@ -52,7 +52,7 @@ import ParchmentCore
             UserDefaults.standard.removeObject(forKey: "comments.read:\(ordering.id.uuidString)")
             workspace.open(second); let secondDocument = workspace.active!
             check(workspace.recentDocuments.urls == [second, first], "Open Recent lists the newest file first")
-            check(secondDocument.layout.mode == .raw && !secondDocument.layout.showFiles, "tabs have independent layouts")
+            check(secondDocument.layout.mode == .rendered && !secondDocument.layout.showFiles, "newly opened files use Rendered mode with independent layouts")
             let count = workspace.documents.count
             workspace.open(first)
             check(workspace.recentDocuments.urls == [first, second], "reopening an existing tab refreshes Open Recent without duplicates")
@@ -116,6 +116,15 @@ import ParchmentCore
             firstDocument.submitReview(summary: "Review complete")
             try firstDocument.save()
             check(try CommentFile.read(for: first).threads.last?.isPending == false, "review submission publishes its saved comments")
+            workspace.close(firstDocument)
+            workspace.open(first)
+            check(workspace.active?.layout.mode == .rendered && workspace.active?.layout.previousSingleMode == .rendered &&
+                  workspace.active?.layout.rightWidth == 333 && workspace.active?.layout.showFiles == true,
+                  "reopening a closed file overrides its saved Split mode while retaining sidebar settings")
+            workspace.active!.layout.showSinglePane(.raw)
+            workspace.close(workspace.active!)
+            workspace.open(first)
+            check(workspace.active?.layout.mode == .rendered, "reopening a closed file overrides its saved Raw mode")
             workspace.newDocument(); workspace.active!.changed("An unsaved draft"); _ = workspace.persist()
             let draftRestored = Workspace(recoveryDirectory: recovery)
             check(draftRestored.active?.text == "An unsaved draft" && draftRestored.active?.url == nil, "unsaved draft survives restoration")
