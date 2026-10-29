@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.35 | 36 | 2026-10-29 | Current release | The agent skill prefers automatic notifications, repairs eligible manual registrations, and requires a stated blocker before manual fallback. |
+| 0.1.36 | 37 | 2026-10-29 | Current release | Added one executable script to build the app, create its installer, and install that exact package. |
+| 0.1.35 | 36 | 2026-10-29 | `7535f03` | The agent skill prefers automatic notifications, repairs eligible manual registrations, and requires a stated blocker before manual fallback. |
 | 0.1.34 | 35 | 2026-10-29 | `ef6719e` | Removed session identifiers from the tab's Sessions menu. |
 | 0.1.33 | 34 | 2026-10-29 | `b62cbed` | Combined session registration and wake-up configuration; added one durable event bus for attachment requests, comments, and reviews. |
 | 0.1.32 | 33 | 2026-10-29 | `28b72e5` | Combined tab attachment menus into Sessions, with check marks and click actions to attach, detach, or cancel a request. |
@@ -40,6 +41,14 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.36
+
+- Added `./scripts/build-and-install.sh` to build the release app and installer, then install the exact new package.
+- Build and install entry scripts are executable. Documentation uses direct script commands.
+- Builds request a normal quit before replacing the app bundle. A refused quit stops the build.
+- Setup prompts and flags remain available. The combined script skips version selection and supports installation previews with `--dry-run`.
+- Pipeline checks cover failure handling, exact package selection, spaces in paths, and invocation from another directory.
 
 ## 0.1.35
 

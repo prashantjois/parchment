@@ -16,7 +16,7 @@ package = Path(sys.argv[1]).resolve()
 
 def run(*arguments, defaults=True):
     options = ['--yes'] if defaults else []
-    return subprocess.run(['bash', str(script), *arguments, *options],
+    return subprocess.run([str(script), *arguments, *options],
                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
 
 
@@ -29,7 +29,7 @@ def selected_choices(output):
 def interactive(answers, *options, script_path=script, package_path=package, env=None):
     terminal, input_fd = os.openpty()
     try:
-        command = ['bash', str(script_path), '--dry-run', *options]
+        command = [str(script_path), '--dry-run', *options]
         if package_path is not None:
             command.extend(['--package', str(package_path)])
         with subprocess.Popen(command, env=env,
@@ -114,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix='parchment-checkout-install-') as tempor
     # Package files determine available versions, not source metadata.
     (checkout / 'scripts/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': '99.0.0'}))
     local_script = checkout / 'scripts/install.sh'
-    shutil.copyfile(script, local_script)
+    shutil.copy2(script, local_script)
     version, architecture = package.stem.split('-')[1:]
     other_architecture = 'x86_64' if architecture == 'arm64' else 'arm64'
 
@@ -130,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix='parchment-checkout-install-') as tempor
     (releases / 'Parchment-not-a-version-universal.pkg').write_bytes(b'Ignore unrelated files')
 
     def selected(*arguments, path=local_script):
-        return subprocess.run(['bash', str(path), '--yes', '--dry-run', *arguments], cwd='/',
+        return subprocess.run([str(path), '--yes', '--dry-run', *arguments], cwd='/',
                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
 
     result = selected()
@@ -190,7 +190,7 @@ with tempfile.TemporaryDirectory(prefix='parchment-checkout-install-') as tempor
 
     standalone = checkout / 'standalone/scripts/install.sh'
     standalone.parent.mkdir(parents=True)
-    shutil.copyfile(script, standalone)
+    shutil.copy2(script, standalone)
     result = selected(path=standalone)
     assert result.returncode != 0 and 'No local installers' in result.stderr
     result = selected('--package', str(package), path=standalone)

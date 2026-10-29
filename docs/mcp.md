@@ -6,7 +6,7 @@ The agent can open Parchment, attach a file, read published feedback, and edit t
 
 ## Client configuration
 
-Build the app with `bash scripts/build-app.sh`. Add this server to your MCP client's configuration:
+Build the app with `./scripts/build-app.sh`. Add this server to your MCP client's configuration:
 
 ```json
 {
@@ -261,7 +261,7 @@ python3 scripts/check-integration.py
 python3 scripts/check-delivery.py
 python3 scripts/check-event-bus.py
 python3 scripts/check-bus-migration.py
-bash scripts/build-app.sh
+./scripts/build-app.sh
 python3 scripts/check-integration.py --app dist/Parchment.app/Contents/MacOS/Parchment --mcp dist/Parchment.app/Contents/MacOS/ParchmentMCP
 ```
 

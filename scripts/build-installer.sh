@@ -1,8 +1,24 @@
 #!/bin/bash
 set -euo pipefail
+output_path_file=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output-path-file)
+            [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { printf 'Missing path for --output-path-file.\n' >&2; exit 1; }
+            output_path_file="$2"
+            shift 2 ;;
+        --help|-h)
+            printf 'Usage: ./scripts/build-installer.sh [--output-path-file PATH]\nBuild the release app and installer. Optionally write the completed package path to PATH.\n'
+            exit 0 ;;
+        *) printf 'Unknown option: %s. See --help.\n' "$1" >&2; exit 1 ;;
+    esac
+done
+if [[ -n "$output_path_file" ]]; then
+    [[ -d "$(dirname "$output_path_file")" ]] || { printf 'The output path directory does not exist.\n' >&2; exit 1; }
+    output_path_file="$(cd "$(dirname "$output_path_file")" && pwd)/$(basename "$output_path_file")"
+fi
 cd "$(dirname "$0")/.."
-
-bash scripts/build-app.sh release
+./scripts/build-app.sh release
 app_directory="$PWD/dist/Parchment.app"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_directory/Contents/Info.plist")"
 architectures="$(/usr/bin/lipo -archs "$app_directory/Contents/MacOS/Parchment")"
@@ -98,4 +114,7 @@ productbuild --distribution "$staging_directory/Distribution.xml" \
     cd dist
     shasum -a 256 "$installer_name" > "$installer_name.sha256"
 )
+if [[ -n "$output_path_file" ]]; then
+    printf '%s\n' "$installer_path" > "$output_path_file"
+fi
 printf 'Built %s\n' "$installer_path"

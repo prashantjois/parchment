@@ -34,14 +34,14 @@ If macOS blocks the installed app, repeat these steps for Parchment. See [Apple'
 From this checkout, run:
 
 ```sh
-bash scripts/install.sh
+./scripts/install.sh
 ```
 
 The script first asks which local version to install. Press Enter for `latest`, or enter a version such as `0.1.27`. The default selects the highest numeric version among compatible installers in this checkout’s `dist/` folder.
 
 The script accepts packages for this Mac’s architecture or universal builds. If both exist for a version, the architecture-specific package takes priority. Missing packages or invalid checksums stop installation. Version selection and installation use local files.
 
-If no local installer is available, run `bash scripts/build-installer.sh`. Use `--version VERSION` or `--package PATH` to skip the version question. A standalone script can install a package supplied with `--package PATH`.
+If no local installer is available, run `./scripts/build-installer.sh`. Use `--version VERSION` or `--package PATH` to skip the version question. A standalone script can install a package supplied with `--package PATH`.
 
 The script verifies the package checksum before installation. It runs macOS's command-line installer with the same setup actions as the graphical installer. Only the installation step requests administrator access. Run the script without `sudo`.
 
@@ -75,13 +75,13 @@ The skill installer backs up a different existing copy. Skipping link registrati
 To skip setup questions, omit the skill, register links, and set Markdown file associations, run:
 
 ```sh
-bash scripts/install.sh --yes --skip-skill --markdown-default
+./scripts/install.sh --yes --skip-skill --markdown-default
 ```
 
 To install a local build, keep its `.pkg.sha256` file beside the package and run:
 
 ```sh
-bash scripts/install.sh --package dist/Parchment-0.1.27-arm64.pkg
+./scripts/install.sh --package dist/Parchment-0.1.27-arm64.pkg
 ```
 
 Use `--version 0.1.27` to select that local version, or `--version latest` to select the newest compatible local installer. Add `--dry-run` to verify the package and inspect the choices without installation. `--help` lists all options. A checksum verifies file integrity; it does not certify that the software is free of malware.
@@ -90,16 +90,28 @@ Use `--version 0.1.27` to select that local version, or `--version latest` to se
 
 Source builds require Apple command-line developer tools and Swift 6.2 or later. The first build downloads Apple's Swift Markdown parser and its cmark dependency.
 
-To create an installer from this checkout, run:
+To build the app, create its installer, and install the new build in one command, run:
 
 ```sh
-bash scripts/build-installer.sh
+./scripts/build-and-install.sh
+```
+
+The script quits Parchment normally before replacing the local app bundle. It builds the app once and installs that exact package. Version selection is skipped. The skill, link registration, and Markdown-default questions keep their Yes defaults. Only installation requests administrator access; run without `sudo`.
+
+Use `./scripts/build-and-install.sh --yes` to accept setup defaults without questions. Existing setup flags such as `--skip-skill` remain available.
+
+Use `./scripts/build-and-install.sh --yes --dry-run` to build both artifacts and preview installation without installing. This still quits Parchment and replaces the local build.
+
+To create an installer without installing it, run:
+
+```sh
+./scripts/build-installer.sh
 ```
 
 For development, build and open the app directly:
 
 ```sh
-bash scripts/build-app.sh
+./scripts/build-app.sh
 open dist/Parchment.app
 ```
 

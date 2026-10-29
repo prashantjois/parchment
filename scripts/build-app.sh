@@ -1,7 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-configuration="${1:-release}"
+case "${1:-release}" in
+    --help|-h) printf 'Usage: ./scripts/build-app.sh [release|debug]\n'; exit 0 ;;
+    release|debug) configuration="${1:-release}" ;;
+    *) printf 'Use release or debug. See --help.\n' >&2; exit 1 ;;
+esac
+[[ $# -le 1 ]] || { printf 'Unexpected arguments. See --help.\n' >&2; exit 1; }
+./scripts/install.sh --quit-only
 mkdir -p dist
 swift build --build-system native -c "$configuration" --product Parchment
 swift build --build-system native -c "$configuration" --product ParchmentMCP

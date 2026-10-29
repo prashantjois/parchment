@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
     cat <<'USAGE'
-Usage: bash scripts/install.sh [options]
+Usage: ./scripts/install.sh [options]
 
 Install Parchment in /Applications using macOS's command-line installer.
 Choose a version interactively; Enter selects the newest local installer in
@@ -23,6 +23,7 @@ Stop if it refuses or does not quit within 30 seconds. A dry run leaves it open.
   --skip-markdown-default  Leave default file associations unchanged.
   --yes                 Skip questions; use defaults for unspecified choices.
   --dry-run             Verify the package and show choices without installing.
+  --quit-only           Request a normal quit and exit without installing.
   --help                Show this help.
 
 The script asks which version to install, then asks about each setup choice.
@@ -43,6 +44,7 @@ register_scheme=""
 markdown_default=""
 assume_defaults=0
 dry_run=0
+quit_only=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version|--package)
@@ -57,6 +59,7 @@ while [[ $# -gt 0 ]]; do
         --skip-markdown-default) markdown_default=0; shift ;;
         --yes) assume_defaults=1; shift ;;
         --dry-run) dry_run=1; shift ;;
+        --quit-only) quit_only=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1. Use --help." ;;
     esac
@@ -69,6 +72,41 @@ fi
 os_version="$(/usr/bin/sw_vers -productVersion)"
 [[ "${os_version%%.*}" -ge 14 ]] || fail 'Parchment requires macOS 14 or later.'
 [[ "$EUID" -ne 0 ]] || fail 'Run this script without sudo; it requests administrator access for installation.'
+quit_parchment() {
+if ! /usr/bin/osascript -l JavaScript - local.parchment.editor <<'JXA'
+ObjC.import('AppKit');
+function run(argv) {
+    const identifier = argv[0];
+    const timeoutSeconds = argv.length > 1 ? Number(argv[1]) : 30;
+    const running = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier);
+    const apps = [];
+    for (let i = 0; i < running.count; i++) apps.push(running.objectAtIndex(i));
+    if (apps.length === 0) return;
+    console.log('Requesting a normal quit from Parchment…');
+    for (const app of apps) {
+        if (!app.isTerminated && !app.terminate) throw new Error('Parchment refused the quit request.');
+    }
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    while (apps.some(app => !app.isTerminated) && Date.now() < deadline) {
+        $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1));
+    }
+    if (apps.some(app => !app.isTerminated) ||
+        $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier).count > 0) {
+        throw new Error('Parchment is still running; installation stopped.');
+    }
+    console.log('Parchment quit normally.');
+}
+JXA
+then
+    fail 'Parchment did not quit normally. Resolve any save dialogs, then run this script again.'
+fi
+}
+if [[ "$quit_only" -eq 1 ]]; then
+    [[ -z "$version$package$install_skill$register_scheme$markdown_default" && "$assume_defaults" -eq 0 && "$dry_run" -eq 0 ]] || fail '--quit-only cannot be combined with installation options.'
+    quit_parchment
+    exit 0
+fi
+
 prompt_choice() {
     local choice_variable="$1" question="$2" default_answer="$3" answer=""
     while true; do
@@ -138,7 +176,7 @@ if [[ -z "$package" ]]; then
                 fi
             fi
         done
-        [[ "${#release_versions[@]}" -gt 0 ]] || fail "No local installers for $architecture found in $release_directory. Build one with bash scripts/build-installer.sh, or supply --package PATH."
+        [[ "${#release_versions[@]}" -gt 0 ]] || fail "No local installers for $architecture found in $release_directory. Build one with ./scripts/build-installer.sh, or supply --package PATH."
         version="$(printf '%s\n' "${release_versions[@]}" | LC_ALL=C sort -t . -k1,1n -k2,2n -k3,3n | tail -n 1)"
         printf 'Latest local version: %s.\n' "$version" >&2
     fi
@@ -147,7 +185,7 @@ if [[ -z "$package" ]]; then
     elif [[ -f "$release_directory/Parchment-$version-universal.pkg" ]]; then
         package="$release_directory/Parchment-$version-universal.pkg"
     else
-        fail "No local installer for $version ($architecture) in $release_directory. Build it with bash scripts/build-installer.sh, or supply --package PATH."
+        fail "No local installer for $version ($architecture) in $release_directory. Build it with ./scripts/build-installer.sh, or supply --package PATH."
     fi
     printf 'Using the local installer for version %s.\n' "$version" >&2
 fi
@@ -183,33 +221,7 @@ if [[ "$dry_run" -eq 1 ]]; then
     exit 0
 fi
 
-if ! /usr/bin/osascript -l JavaScript - local.parchment.editor <<'JXA'
-ObjC.import('AppKit');
-function run(argv) {
-    const identifier = argv[0];
-    const timeoutSeconds = argv.length > 1 ? Number(argv[1]) : 30;
-    const running = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier);
-    const apps = [];
-    for (let i = 0; i < running.count; i++) apps.push(running.objectAtIndex(i));
-    if (apps.length === 0) return;
-    console.log('Requesting a normal quit from Parchment…');
-    for (const app of apps) {
-        if (!app.isTerminated && !app.terminate) throw new Error('Parchment refused the quit request.');
-    }
-    const deadline = Date.now() + timeoutSeconds * 1000;
-    while (apps.some(app => !app.isTerminated) && Date.now() < deadline) {
-        $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1));
-    }
-    if (apps.some(app => !app.isTerminated) ||
-        $.NSRunningApplication.runningApplicationsWithBundleIdentifier(identifier).count > 0) {
-        throw new Error('Parchment is still running; installation stopped.');
-    }
-    console.log('Parchment quit normally.');
-}
-JXA
-then
-    fail 'Parchment did not quit normally. Resolve any save dialogs, then run this script again.'
-fi
+quit_parchment
 
 printf 'Installing in /Applications. macOS will request administrator access.\n' >&2
 /usr/bin/sudo /usr/sbin/installer -pkg "$package" -target / -applyChoiceChangesXML "$choices"
