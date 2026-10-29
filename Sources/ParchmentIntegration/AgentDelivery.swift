@@ -2,104 +2,89 @@ import Foundation
 import Darwin
 
 extension IntegrationRegistry {
-    public func registerReceiver(_ args: JSON) throws -> JSON {
-        let owner = try session(args.require("session_token"))
-        let agent = try args.require("agent_session_id"), executable = try args.require("executable")
-        let arguments = args["arguments"] == .null ? [] : args["arguments"].array
-        guard agent.utf8.count <= 1024, !agent.contains("\0"),
-              executable.hasPrefix("/"), !executable.contains("\0"),
-              FileManager.default.isExecutableFile(atPath: executable),
-              arguments.count <= 128, arguments.allSatisfy({ $0.string != nil && !$0.string!.contains("\0") }),
+    public func validateWakeUpConfiguration(_ configuration: JSON) throws {
+        guard case .object = configuration else { throw BridgeError("INVALID_RECEIVER", "wake_up must contain mode: command or manual.") }
+        let mode = try configuration.require("mode")
+        if mode == "manual" {
+            guard Set(configuration.object.keys) == ["mode"] else { throw BridgeError("INVALID_RECEIVER", "Manual delivery accepts only mode: manual.") }
+            return
+        }
+        guard mode == "command", Set(configuration.object.keys).isSubset(of: ["mode", "agent_session_id", "executable", "arguments"]) else {
+            throw BridgeError("INVALID_RECEIVER", "Use mode: command with an existing agent session ID, executable, and arguments, or mode: manual.")
+        }
+        let agent = try configuration.require("agent_session_id"), executable = try configuration.require("executable")
+        let arguments = configuration["arguments"] == .null ? [] : configuration["arguments"].array
+        if configuration["arguments"] != .null {
+            guard case .array = configuration["arguments"] else { throw BridgeError("INVALID_RECEIVER", "Receiver arguments must be a string array.") }
+        }
+        guard agent.utf8.count <= 1024, !agent.contains("\0"), executable.hasPrefix("/"), !executable.contains("\0"),
+              FileManager.default.isExecutableFile(atPath: executable), arguments.count <= 128,
+              arguments.allSatisfy({ $0.string != nil && !$0.string!.contains("\0") }),
               arguments.reduce(0, { $0 + ($1.string?.utf8.count ?? 0) }) <= 16384 else {
-            throw BridgeError("INVALID_RECEIVER", "Supply an agent session ID, an absolute executable path, and at most 128 string arguments (16 KB total).")
+            throw BridgeError("INVALID_RECEIVER", "Supply an existing agent session ID, an absolute executable, and at most 128 string arguments (16 KB total).")
         }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: executable, isDirectory: &isDirectory), !isDirectory.boolValue else {
             throw BridgeError("INVALID_RECEIVER", "The receiver executable must be a file.")
         }
-        let sessionID = owner["session_id"], encoded = JSON.array(arguments).text()
-        return try transaction {
+    }
+    /// The caller holds the transaction so identity and wake-up settings commit together.
+    func configureWakeUp(sessionID: JSON, configuration: JSON) throws {
+        try validateWakeUpConfiguration(configuration)
+        let mode = try configuration.require("mode")
+        if mode == "manual" { try execute("DELETE FROM receivers WHERE session_id=?", [sessionID]) }
+        else {
+            let agent = configuration["agent_session_id"], executable = configuration["executable"]
+            let encoded = JSON.array(configuration["arguments"].array).text()
             let current = try rows("SELECT * FROM receivers WHERE session_id=?", [sessionID]).first
-            if current?["agent_session_id"] != .string(agent) || current?["executable"] != .string(executable) || current?["arguments"] != .string(encoded) {
-                try execute("UPDATE attachment_requests SET accepted_at=NULL,lease_id=NULL,lease_until=0,next_attempt=0,last_error=NULL WHERE session_id=? AND state='pending'", [sessionID])
+            if current?["agent_session_id"] != agent || current?["executable"] != executable || current?["arguments"] != .string(encoded) {
                 try execute("DELETE FROM receivers WHERE session_id=?", [sessionID])
-                try execute("INSERT INTO receivers(session_id,receiver_id,agent_session_id,executable,arguments) VALUES(?,?,?,?,?)", [sessionID, .string(UUID().uuidString), .string(agent), .string(executable), .string(encoded)])
+                try execute("INSERT INTO receivers(session_id,receiver_id,agent_session_id,executable,arguments) VALUES(?,?,?,?,?)", [sessionID, .string(UUID().uuidString), agent, executable, .string(encoded)])
             }
-            return try receiverStatus(sessionID: sessionID)
+        }
+        try execute("UPDATE sessions SET wake_up_mode=? WHERE id=?", [.string(mode), sessionID])
+    }
+    /// Compatibility entry point. New clients supply wake_up when creating or updating a session.
+    public func registerReceiver(_ args: JSON) throws -> JSON {
+        try transaction {
+            let owner = try session(args.require("session_token"))
+            try configureWakeUp(sessionID: owner["session_id"], configuration: .object([
+                "mode": .string("command"), "agent_session_id": args["agent_session_id"], "executable": args["executable"],
+                "arguments": args["arguments"] == .null ? .array([]) : args["arguments"]]))
+            return try receiverStatus(sessionID: owner["session_id"])
         }
     }
     public func unregisterReceiver(_ args: JSON) throws -> JSON {
-        let owner = try session(args.require("session_token"))
-        try execute("DELETE FROM receivers WHERE session_id=?", [owner["session_id"]])
-        return .object(["registered": .bool(false)])
+        try transaction {
+            let owner = try session(args.require("session_token"))
+            try configureWakeUp(sessionID: owner["session_id"], configuration: .object(["mode": .string("manual")]))
+            return try receiverStatus(sessionID: owner["session_id"])
+        }
     }
     public func receiverStatus(_ args: JSON) throws -> JSON {
         let owner = try session(args.require("session_token"))
         return try receiverStatus(sessionID: owner["session_id"])
     }
     func receiverStatus(sessionID: JSON) throws -> JSON {
-        guard let receiver = try rows("SELECT receiver_id,agent_session_id FROM receivers WHERE session_id=?", [sessionID]).first else {
-            return .object(["registered": .bool(false), "mode": .string("manual")])
-        }
+        try synchronizeSessionEvents()
+        let receiver = try rows("SELECT receiver_id,agent_session_id FROM receivers WHERE session_id=?", [sessionID]).first
         let outstanding = try rows("SELECT COUNT(*) AS count FROM feedback f JOIN bindings b ON b.document_id=f.document_id WHERE b.session_id=? AND f.sequence>b.acknowledged", [sessionID]).first?["count"] ?? .integer(0)
-        let accepted = try rows("SELECT COUNT(*) AS count FROM notifications n JOIN bindings b ON b.document_id=n.document_id AND b.binding_id=n.binding_id WHERE n.receiver_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NOT NULL", [receiver["receiver_id"]!]).first?["count"] ?? .integer(0)
-        let failed = try rows("SELECT n.attempts,n.last_error,n.next_attempt FROM notifications n JOIN bindings b ON b.binding_id=n.binding_id WHERE n.receiver_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NULL AND n.last_error IS NOT NULL ORDER BY n.sequence LIMIT 1", [receiver["receiver_id"]!]).first
-        let requestFailure = try rows("SELECT attempts,last_error,next_attempt FROM attachment_requests WHERE session_id=? AND state='pending' AND accepted_at IS NULL AND last_error IS NOT NULL ORDER BY created LIMIT 1", [sessionID]).first
-        let failure = failed ?? requestFailure
+        let pending = try rows("SELECT COUNT(*) AS count FROM session_events WHERE session_id=? AND state='pending'", [sessionID]).first?["count"] ?? .integer(0)
         let requests = try rows("SELECT COUNT(*) AS count FROM attachment_requests WHERE session_id=? AND state='pending'", [sessionID]).first?["count"] ?? .integer(0)
-        return .object(["registered": .bool(true), "mode": .string("automatic"), "protocol_version": .integer(1),
-                        "receiver_id": receiver["receiver_id"]!, "agent_session_id": receiver["agent_session_id"]!,
-                        "pending_attachment_requests": requests, "pending_feedback": outstanding, "accepted_notifications": accepted,
-                        "last_error": failure?["last_error"] ?? .null, "attempts": failure?["attempts"] ?? .integer(0),
-                        "next_attempt": failure?["next_attempt"] ?? .null])
-    }
-    /// Claim a lease so the app and an optional standalone worker cannot send concurrently.
-    public func claimNotification() throws -> JSON? {
-        try transaction {
-            if let request = try claimAttachmentRequest() { return request }
-            try execute("""
-                INSERT OR IGNORE INTO notifications(delivery_id,receiver_id,document_id,binding_id,generation,sequence)
-                SELECT lower(hex(randomblob(16))),r.receiver_id,b.document_id,b.binding_id,b.generation,f.sequence
-                FROM feedback f JOIN bindings b ON b.document_id=f.document_id JOIN receivers r ON r.session_id=b.session_id
-                WHERE f.sequence>b.acknowledged
-                """)
-            let now = Date().timeIntervalSince1970
-            guard var row = try rows("""
-                SELECT n.*,r.session_id,r.agent_session_id,r.executable,r.arguments,f.event_id
-                FROM notifications n JOIN receivers r ON r.receiver_id=n.receiver_id
-                JOIN bindings b ON b.binding_id=n.binding_id AND b.generation=n.generation AND b.session_id=r.session_id
-                JOIN feedback f ON f.sequence=n.sequence
-                WHERE n.sequence>b.acknowledged AND n.accepted_at IS NULL AND n.next_attempt<=? AND n.lease_until<=?
-                ORDER BY n.sequence LIMIT 1
-                """, [.number(now), .number(now)]).first else { return nil }
-            let lease = UUID().uuidString
-            try execute("UPDATE notifications SET lease_id=?,lease_until=?,attempts=attempts+1 WHERE delivery_id=?", [.string(lease), .number(now + 30), row["delivery_id"]!])
-            row["lease_id"] = .string(lease)
-            row["attempts"] = .integer((row["attempts"]?.int ?? 0) + 1)
-            return .object(row)
-        }
-    }
-    public func notificationIsCurrent(_ delivery: JSON) throws -> Bool {
-        if delivery["type"].string == "parchment.attachment_requested" { return try attachmentRequestIsCurrent(delivery) }
-        return !(try rows("""
-            SELECT n.delivery_id FROM notifications n JOIN receivers r ON r.receiver_id=n.receiver_id
-            JOIN bindings b ON b.binding_id=n.binding_id AND b.generation=n.generation AND b.session_id=r.session_id
-            WHERE n.delivery_id=? AND n.lease_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NULL
-            """, [delivery["delivery_id"], delivery["lease_id"]])).isEmpty
-    }
-    public func finishNotification(_ delivery: JSON, error: String?) throws {
-        if delivery["type"].string == "parchment.attachment_requested" { return try finishAttachmentRequest(delivery, error: error) }
-        if let error {
-            let delay = min(60.0, pow(2, Double(min(delivery["attempts"].int ?? 1, 6))))
-            try execute("UPDATE notifications SET lease_id=NULL,lease_until=0,next_attempt=?,last_error=? WHERE delivery_id=? AND lease_id=?", [.number(Date().timeIntervalSince1970 + delay), .string(error), delivery["delivery_id"], delivery["lease_id"]])
-        } else {
-            try execute("UPDATE notifications SET lease_id=NULL,lease_until=0,accepted_at=?,last_error=NULL WHERE delivery_id=? AND lease_id=?", [.number(Date().timeIntervalSince1970), delivery["delivery_id"], delivery["lease_id"]])
-        }
+        let accepted = try rows("SELECT COUNT(*) AS count FROM event_wakeups w JOIN session_events e ON e.bus_event_id=w.bus_event_id WHERE e.session_id=? AND e.state='pending' AND w.accepted_at IS NOT NULL", [sessionID]).first?["count"] ?? .integer(0)
+        let failed = try rows("SELECT w.attempts,w.last_error,w.next_attempt FROM event_wakeups w JOIN session_events e ON e.bus_event_id=w.bus_event_id WHERE e.session_id=? AND e.state='pending' AND w.accepted_at IS NULL AND w.last_error IS NOT NULL ORDER BY e.cursor LIMIT 1", [sessionID]).first
+        let mode = try rows("SELECT wake_up_mode FROM sessions WHERE id=?", [sessionID]).first?["wake_up_mode"] ?? .string("unspecified")
+        return .object(["registered": .bool(receiver != nil), "mode": .string(receiver == nil ? "manual" : "automatic"), "wake_up_mode": mode,
+                        "protocol_version": .integer(2), "event_bus_version": .integer(1),
+                        "receiver_id": receiver?["receiver_id"] ?? .null, "agent_session_id": receiver?["agent_session_id"] ?? .null,
+                        "pending_events": pending, "pending_attachment_requests": requests, "pending_feedback": outstanding,
+                        "accepted_notifications": accepted, "last_error": failed?["last_error"] ?? .null,
+                        "attempts": failed?["attempts"] ?? .integer(0), "next_attempt": failed?["next_attempt"] ?? .null])
     }
 }
 
 /// The receiver queues input in the existing agent session and exits after acceptance.
-public struct FeedbackDispatcher: Sendable {
+public struct SessionEventDispatcher: Sendable {
     public let registry: IntegrationRegistry
     public init(registry: IntegrationRegistry) { self.registry = registry }
     public func run() async {
@@ -119,13 +104,13 @@ public struct FeedbackDispatcher: Sendable {
         do {
             guard !Task.isCancelled, try registry.notificationIsCurrent(delivery) else { return }
             let isAttachment = delivery["type"].string == "parchment.attachment_requested"
-            let message = isAttachment
-                ? "🤖 The user requested attaching Parchment document \(delivery["document_id"].string!) to this existing agent conversation. Resume your original Parchment session. Synchronize its session name and model. Call attach_document with your retained token and attachment_request_id \(delivery["delivery_id"].string!). Read the latest document and get_feedback before changes. Keep work within the user’s task. Attachment alone does not request edits. Stop on STALE_ATTACHMENT_REQUEST; do not retry without the request ID. Request \(delivery["delivery_id"].string!)."
-                : "🤖 Published Parchment feedback is available for document \(delivery["document_id"].string!). Resume your existing Parchment session and synchronize its name and model. Attach this document to validate ownership, and read get_feedback. Read the latest document before edits. Handle feedback within the user's task, then acknowledge only the handled cursors. Notification \(delivery["delivery_id"].string!) (event \(delivery["event_id"].string!), binding \(delivery["binding_id"].string!), generation \(delivery["generation"].int!))."
-            let payload: JSON = .object(["protocol_version": .integer(1), "type": .string(isAttachment ? "parchment.attachment_requested" : "parchment.feedback_available"),
-                "attachment_request_id": isAttachment ? delivery["delivery_id"] : .null, "delivery_id": delivery["delivery_id"], "event_id": delivery["event_id"], "cursor": delivery["sequence"],
-                "session_id": delivery["session_id"], "agent_session_id": delivery["agent_session_id"],
-                "document_id": delivery["document_id"], "binding_id": delivery["binding_id"], "generation": delivery["generation"], "message": .string(message)])
+            let message = "🤖 Parchment has a queued \(isAttachment ? "attachment request" : "feedback event") for document \(delivery["document_id"].string!). Resume your original Parchment session and synchronize its name and model. Call get_events with your retained token to read this session’s event bus. Process events within the user’s task. Attachment requests require their attachment_request_id. Feedback requires the current binding and get_feedback. Read the latest document before edits. Acknowledge only handled feedback and events. Stop on stale ownership; do not reclaim a detached file from an old notification. Notification \(delivery["delivery_id"].string!), bus event \(delivery["bus_event_id"].string!)."
+            let payload: JSON = .object(["protocol_version": .integer(2), "type": delivery["type"],
+                "bus_event_id": delivery["bus_event_id"], "bus_cursor": delivery["bus_cursor"],
+                "attachment_request_id": delivery["attachment_request_id"], "delivery_id": delivery["delivery_id"],
+                "event_id": delivery["event_id"], "cursor": delivery["sequence"], "session_id": delivery["session_id"],
+                "agent_session_id": delivery["agent_session_id"], "document_id": delivery["document_id"],
+                "binding_id": delivery["binding_id"], "generation": delivery["generation"], "message": .string(message)])
             let substitutions = ["{agent_session_id}": delivery["agent_session_id"].string!, "{message}": message,
                                  "{delivery_id}": delivery["delivery_id"].string!, "{document_id}": delivery["document_id"].string!]
             process.executableURL = URL(fileURLWithPath: try delivery.require("executable"))

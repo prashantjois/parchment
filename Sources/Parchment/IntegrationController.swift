@@ -40,7 +40,7 @@ import ParchmentIntegration
             }
         }
         syncFeedback()
-        let dispatcher = FeedbackDispatcher(registry: registry)
+        let dispatcher = SessionEventDispatcher(registry: registry)
         dispatcherTask = Task.detached { await dispatcher.run() }
     }
     func stop() { timer?.cancel(); dispatcherTask?.cancel(); server.stop() }
@@ -233,7 +233,7 @@ import ParchmentIntegration
         guard let workspace else { throw BridgeError("APP_UNAVAILABLE", "The editor is closing.") }
         defer { refreshAttachments() }
         switch method {
-        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "agent_delivery_version": .integer(1), "attachment_requests_version": .integer(1), "pid": .integer(Int(getpid()))])
+        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "agent_delivery_version": .integer(2), "event_bus_version": .integer(1), "attachment_requests_version": .integer(1), "pid": .integer(Int(getpid()))])
         case "activate":
             if !headless { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first(where: { $0.title == "Parchment" })?.makeKeyAndOrderFront(nil) }
             return .object(["running": .bool(true)])

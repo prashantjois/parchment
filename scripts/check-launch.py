@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix="parchment-launch-") as temporary:
         assert generated.scheme == "parchment" and not generated.query
         assert os.path.samefile(unquote("/" + generated.netloc + generated.path), document)
         print("PASS registered parchment link launches the app and opens an encoded path without attaching an agent")
-        session = helper.tool("create_session", {"client": "Launch check", "conversation_label": "Isolated launch"})
+        session = helper.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Launch check", "conversation_label": "Isolated launch"})
         opened = helper.tool("open_document", {"path": str(document), "attach": True, "session_token": session["session_token"], "activate": False})
         pid = helper.tool("open_app", {"activate": False})["pid"]
         assert helper.tool("get_document", {"document_id": opened["document_id"]})["text"] == document.read_text()

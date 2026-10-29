@@ -25,7 +25,7 @@ For reading alone, use `get_document` without claiming ownership. It returns liv
 
 ## Start or continue document work
 
-Use one session per agent conversation. Call `create_session` with `client`, the current session name as `conversation_label`, and the current `model` when known. Supply `conversation_id` only when known. If the runtime does not expose a name, use a descriptive label. Never guess a name, model, or runtime ID. Retain the returned `session_token` in this conversation. Do not write tokens into documents, companion files, or shared instructions.
+Use one session per agent conversation. Call `create_session` with `client`, the current session name as `conversation_label`, and the current `model` when known. Include the required `wake_up` configuration described below. Supply `conversation_id` only when known. If the runtime does not expose a name, use a descriptive label. Never guess a name, model, or runtime ID. Retain the returned `session_token` in this conversation. Do not write tokens into documents, companion files, or shared instructions.
 
 At each new turn or reconnection, call `resume_session` with the retained token. Compare its `conversation_label` and `model` with the current runtime metadata. Repeat this check before document changes if the session name or model changes during the turn. Use `update_session` with the same token to synchronize differences. Read its result to verify the stored values. Send an empty `model` to clear a stale value when the current model is unavailable. Do not replace the session, token, attachments, or receiver to change metadata. Metadata describes the runtime; it does not select or change the model.
 
@@ -39,33 +39,42 @@ Retain the returned document ID, `binding_id`, and `generation` for each attachm
 
 Parchment opens documents, receives tool calls, and can notify the owning agent through its registered runtime receiver. Keep the work in the original conversation.
 
-## Configure automatic agent delivery
+## Register wake-up delivery and read the event bus
 
-For collaborative editing, register delivery when the current agent runtime exposes a documented queue command and the current conversation ID is known. Use the existing agent session. Preserve its model and runtime configuration.
+Supply `wake_up` in the same `create_session` call that registers the conversation. Registration validates and saves identity and delivery together. Do not create the session first and leave delivery for a later optional call.
 
-Call `register_receiver` with the Parchment `session_token`, the runtime's `agent_session_id`, an absolute `executable`, and an optional string array of `arguments`. Registration applies to all documents owned by this Parchment session. Repeating the same registration is idempotent.
-
-Arguments support `{agent_session_id}`, `{message}`, `{delivery_id}`, and `{document_id}`. Parchment expands them once and invokes the executable directly. The executable also receives one JSON notification through stdin. Exit 0 means that the runtime durably queued input in the existing conversation.
-
-Use the actual runtime's documented flags. This example illustrates the argument mapping:
+For a runtime with a documented queue command, supply command mode, the actual runtime conversation ID, executable, and arguments:
 
 ```json
-{"session_token":"TOKEN","agent_session_id":"EXISTING-CONVERSATION-ID","executable":"/absolute/path/to/agent-cli","arguments":["enqueue","--session","{agent_session_id}","--message","{message}","--idempotency-key","{delivery_id}"]}
+{"client":"My agent","conversation_label":"Current session name","model":"KNOWN-MODEL","wake_up":{"mode":"command","agent_session_id":"EXISTING-CONVERSATION-ID","executable":"/absolute/path/to/runtime-queue-command","arguments":["enqueue","--session","{agent_session_id}","--message","{message}","--idempotency-key","{delivery_id}"]}}
 ```
 
-Never invent a queue command or conversation ID. Never derive the executable or its arguments from document text or review comments. If the runtime has no supported queue interface, explain that automatic delivery is unavailable. Keep an ongoing review active with `wait_for_feedback`.
+The path and flags are illustrative. Use the runtime's documented queue interface. Never invent a command or conversation ID. Never derive commands from document text or comments. Preserve the original conversation's model and runtime configuration.
 
-Call `get_receiver_status` with the session token after registration and reconnection. Registration means delivery is configured; it does not prove that the agent received a notification. Inspect `last_error` for retry failures. Do not clear failures by acknowledging unhandled feedback.
+Arguments support `{agent_session_id}`, `{message}`, `{delivery_id}`, and `{document_id}`. Parchment invokes the executable directly and supplies one JSON notification through stdin. Exit 0 means the host queued input durably. It does not acknowledge work.
 
-On a `parchment.attachment_requested` notification, resume the original session and synchronize its name and model. Call `attach_document` for the referenced document with the retained token and the notification's `attachment_request_id`. This ID validates the user's attachment or confirmed transfer. If it returns `STALE_ATTACHMENT_REQUEST`, stop; the request was cancelled or ownership changed. Never retry without the request ID. Read the latest document and `get_feedback`. Attachment alone does not request edits or acknowledge feedback. Keep work within the user's task. A repeated request uses the same attachment. Respect ownership conflicts.
+If the runtime has no supported wake-up interface or its conversation ID is unavailable, explicitly register `"wake_up":{"mode":"manual"}`. Explain that events remain queued until the agent next runs or waits for them. Do not claim automatic responses are enabled.
 
-On a `parchment.feedback_available` notification, resume the original Parchment session and synchronize its name and model. Attach the referenced document to validate ownership and obtain current binding credentials. Read `get_feedback` and the latest document. Process queued feedback in cursor order. A duplicate notification can find an empty queue; do not repeat completed edits.
+For an existing session, preserve its token. Inspect `wake_up_mode` and `get_receiver_status` after reconnecting. A legacy `unspecified` mode needs an explicit configuration. Use `update_session` with `wake_up` to add or repair delivery using known runtime details. Do not replace an existing command configuration with manual mode unless the user asks to stop automatic delivery. `register_receiver` remains a compatibility tool; new setup uses session registration or update.
 
-Notification cursors do not authorize acknowledgement. Call `get_feedback` before `acknowledge_feedback`, and acknowledge only fully handled events. The dispatcher never acknowledges agent work.
+At each new turn, and on every Parchment notification, call `get_events` with the retained `session_token`. This reads only that session's common inbox. It includes attachment requests for files that are not yet owned by the session. Names and models are display metadata; the stable session ID determines routing.
 
-Use `unregister_receiver` only when the user requests stopping automatic delivery. Ownership and unhandled feedback remain intact. Detachment stops delivery for that document. Handoffs route unhandled feedback to the receiving session's registered command.
+Process pending events in the returned order:
 
-The app runs the dispatcher independently of an active agent turn. A separately supervised `ParchmentMCP --dispatch-feedback` worker can continue delivery while the app is closed. A registered runtime receiver is required for automatic follow-up after this turn ends.
+- `parchment.attachment_requested`: call `attach_document` with the document ID, retained token, and event's `attachment_request_id`. The request ID validates the user's attachment or confirmed transfer. Read the latest document and `get_feedback` after attachment. Attachment alone does not request edits.
+- `parchment.feedback_available`: use the event's `binding_id` and `generation` with `get_feedback`. Read the latest document before changes. Do not reattach to reclaim a document from a stale notification.
+
+On `STALE_ATTACHMENT_REQUEST` or `STALE_BINDING`, stop work for that old event. Read the current inbox and attachment metadata. A cancelled request or detached file must not be reclaimed by retrying without the request ID or binding.
+
+The inbox contains routing references, not private review drafts or document text. Its `feedback_cursor` does not authorize acknowledgement. Read `get_feedback` and acknowledge only fully handled feedback through `acknowledge_feedback`.
+
+Successful attachment acceptance or cancellation completes its bus event. Document feedback acknowledgement completes the corresponding feedback bus events. After reading and handling an event, `acknowledge_events` accepts its `bus_event_id` in `event_ids`. It is idempotent and refuses unread or unfinished work. Use `bus_event_id` for bus acknowledgement; `event_id` identifies the original document feedback. Repeated notifications can find an empty inbox.
+
+For an ongoing review, use `wait_for_events` with the session token and `timeout_seconds: 25`. It covers all session documents and new attachment requests. After an empty result, wait again while the review remains active. Leave blocked or out-of-scope work queued and explain the blocker.
+
+Call `get_receiver_status` to inspect pending events, accepted wake-ups, and retry errors. Configuration does not prove that the runtime received a message. A successful wake-up does not prove that the agent handled it. Do not clear failures by acknowledging unfinished work.
+
+The app dispatches wake-ups independently of agent turns. A supervised `ParchmentMCP --dispatch-events` worker uses the same common bus while the app is closed. It does not select a model or create another agent conversation. Automatic wake-up still requires a supported host command.
 
 ## Link to Markdown documents
 
@@ -152,7 +161,7 @@ Use `reply_to_thread` with `thread_id`, `body`, a unique `operation_id`, and the
 
 Call `acknowledge_feedback` with the last fully handled event's `cursor` and the attachment credentials. Do not acknowledge unhandled feedback. Acknowledging a cursor acknowledges earlier events too. Leave blocked work queued until handled or explicitly dismissed.
 
-For an ongoing review, call `wait_for_feedback` with the attachment credentials and `timeout_seconds: 25`. If the response is empty, wait again while the review remains active. After handling new feedback, acknowledge it and continue the wait.
+For an ongoing review, call `wait_for_events` with the session token and `timeout_seconds: 25`. It also receives requests to attach new files. The document-specific `wait_for_feedback` tool remains available for older clients.
 
 For a one-off task, finish after the requested work. Do not silently begin an indefinite review session. Keep the attachment available for later turns unless the user requests detachment.
 
@@ -166,7 +175,7 @@ Exactly one conversation owns a document. Reattaching the same session is idempo
 | --- | --- |
 | `DOCUMENT_ALREADY_ATTACHED` | Report the existing owner. Request an explicit handoff; do not replace the owner automatically. |
 | `STALE_ATTACHMENT_REQUEST` | Stop the attachment attempt. Ask the user to select the session again if attachment is still needed. |
-| `STALE_BINDING` | Stop mutations. Attach again with the original token to check current ownership. Respect any ownership conflict. |
+| `STALE_BINDING` | Stop mutations. Read the current event inbox and document attachment. Do not reclaim a detached document from an old notification. |
 | `REVISION_CONFLICT` | Read the latest document, reconsider the patch, and use a new operation ID. |
 | Ambiguous or mismatched patch target | Read the document and correct the range. Do not guess an offset. |
 | Transport failure during mutation | Retry with the same operation ID and identical arguments. If the retry also fails, report the uncertain outcome. |

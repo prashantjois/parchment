@@ -139,7 +139,9 @@ Each comment has an event ID and thread ID. Each notification has a stable deliv
 
 Configure your MCP client with `dist/Parchment.app/Contents/MacOS/ParchmentMCP` as an absolute executable path. See [MCP setup and workflow](docs/mcp.md).
 
-Published feedback can notify the owning agent after its turn ends. Register the existing agent session and its runtime queue command through `register_receiver`. Parchment delivers notifications with durable retries; the agent reads and acknowledges feedback through MCP. The protocol works across models and frameworks with a supported runtime queue interface. Without a receiver, the wait tool works within an active conversation. See [automatic agent delivery](docs/mcp.md#automatic-agent-delivery).
+Session registration includes a required `wake_up` setting: a supported runtime queue command or explicit manual delivery. Attachment requests, comments, and reviews enter one durable event bus for that session. A shared dispatcher uses the registered command to wake the original conversation. Agents read their inbox through `get_events` and acknowledge handled work through MCP.
+
+Every registered session can receive attachment requests from Parchment. Without automatic wake-up, events wait until the agent next runs or calls `wait_for_events`. The protocol works across models and frameworks. See [the common event bus](docs/mcp.md#common-session-event-bus).
 
 The loadable [Parchment agent skill](skills/parchment/SKILL.md) makes Parchment the default for Markdown document work. It covers document attachment, live edits, published feedback, review sessions, and conflict recovery. Load the file directly, or install the `skills/parchment` folder in your agent's skill directory. The skill requires the Parchment MCP connection described above.
 

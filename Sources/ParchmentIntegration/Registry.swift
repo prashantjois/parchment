@@ -19,7 +19,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
         chmod(path, 0o600); sqlite3_busy_timeout(db, 5000)
         try execute("PRAGMA journal_mode=WAL"); try execute("PRAGMA synchronous=FULL"); try execute("PRAGMA foreign_keys=ON")
         let version = try rows("PRAGMA user_version").first?["user_version"]?.int ?? 0
-        guard version <= 2 else { throw BridgeError("REGISTRY_VERSION_UNSUPPORTED", "This registry requires a newer Parchment version.") }
+        guard version <= 3 else { throw BridgeError("REGISTRY_VERSION_UNSUPPORTED", "This registry requires a newer Parchment version.") }
         try transaction {
             try execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, client TEXT NOT NULL, label TEXT NOT NULL, conversation_id TEXT, last_seen REAL NOT NULL)")
             try execute("CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, path TEXT UNIQUE, identity TEXT, title TEXT NOT NULL, updated REAL NOT NULL)")
@@ -28,7 +28,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
             try execute("CREATE TABLE IF NOT EXISTS feedback (sequence INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL, document_id TEXT NOT NULL REFERENCES documents(id), payload TEXT NOT NULL, created REAL NOT NULL, UNIQUE(document_id,event_id))")
             try execute("CREATE INDEX IF NOT EXISTS feedback_document_sequence ON feedback(document_id, sequence)")
             try execute("CREATE TABLE IF NOT EXISTS operations (operation_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, binding_id TEXT NOT NULL, generation INTEGER NOT NULL, request_hash TEXT NOT NULL, before_revision TEXT, after_revision TEXT, result TEXT NOT NULL, state TEXT NOT NULL)")
-            // Delivery is additive. Existing document/session tables remain compatible.
+            // Legacy delivery tables remain for migration. New delivery uses the session event bus.
             try execute("CREATE TABLE IF NOT EXISTS receivers (session_id TEXT PRIMARY KEY REFERENCES sessions(id), receiver_id TEXT NOT NULL UNIQUE, agent_session_id TEXT NOT NULL, executable TEXT NOT NULL, arguments TEXT NOT NULL)")
             try execute("CREATE TABLE IF NOT EXISTS notifications (delivery_id TEXT PRIMARY KEY, receiver_id TEXT NOT NULL REFERENCES receivers(receiver_id) ON DELETE CASCADE, document_id TEXT NOT NULL REFERENCES documents(id), binding_id TEXT NOT NULL, generation INTEGER NOT NULL, sequence INTEGER NOT NULL REFERENCES feedback(sequence), attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, lease_id TEXT, lease_until REAL NOT NULL DEFAULT 0, accepted_at REAL, last_error TEXT, UNIQUE(receiver_id,binding_id,sequence))")
             try execute("CREATE INDEX IF NOT EXISTS notification_due ON notifications(accepted_at,next_attempt,lease_until)")
@@ -36,7 +36,12 @@ public final class IntegrationRegistry: @unchecked Sendable {
                 try execute("ALTER TABLE sessions ADD COLUMN model TEXT")
             }
             try execute("CREATE TABLE IF NOT EXISTS attachment_requests (request_id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id), session_id TEXT NOT NULL REFERENCES sessions(id), state TEXT NOT NULL DEFAULT 'pending', expected_binding_id TEXT, created REAL NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, lease_id TEXT, lease_until REAL NOT NULL DEFAULT 0, accepted_at REAL, last_error TEXT, UNIQUE(document_id,session_id))")
-            try execute("PRAGMA user_version=2")
+            if !(try rows("PRAGMA table_info(sessions)")).contains(where: { $0["name"]?.string == "wake_up_mode" }) {
+                try execute("ALTER TABLE sessions ADD COLUMN wake_up_mode TEXT NOT NULL DEFAULT 'unspecified'")
+                try execute("UPDATE sessions SET wake_up_mode='command' WHERE id IN (SELECT session_id FROM receivers)")
+            }
+            try createEventBus(migrating: version < 3)
+            try execute("PRAGMA user_version=3")
         }
     }
     deinit { sqlite3_close(db) }
@@ -134,17 +139,22 @@ public final class IntegrationRegistry: @unchecked Sendable {
         value["display_name"] = .string(Self.sessionDisplayName(.object(row)))
         return .object(value)
     }
-    public func createSession(client: String, label: String, conversationID: String?, model: String? = nil) throws -> JSON {
+    public func createSession(client: String, label: String, conversationID: String?, model: String? = nil, wakeUp: JSON) throws -> JSON {
         try validateSessionMetadata(label: label, model: model)
-        let id = UUID().uuidString, token = UUID().uuidString + UUID().uuidString
-        try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen,model) VALUES(?,?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now, model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null])
-        var result = try session(token).object
-        result["session_token"] = .string(token)
-        result["instructions"] = .string("Keep this token in this conversation. Resume it and compare the session name and model with the current runtime. Use update_session to synchronize changes without replacing this identity.")
-        return .object(result)
+        try validateWakeUpConfiguration(wakeUp)
+        return try transaction {
+            let id = UUID().uuidString, token = UUID().uuidString + UUID().uuidString
+            try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen,model) VALUES(?,?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now, model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null])
+            try configureWakeUp(sessionID: .string(id), configuration: wakeUp)
+            var result = try session(token).object
+            result["session_token"] = .string(token)
+            result["delivery"] = try receiverStatus(sessionID: .string(id))
+            result["instructions"] = .string("Keep this token in the original conversation. Resume it and synchronize its name and model. Use get_events each turn to read your session inbox. Wake-up configuration is part of registration; update_session can change it without replacing this identity.")
+            return .object(result)
+        }
     }
     public func session(_ token: String) throws -> JSON {
-        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id,model,last_seen FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
+        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id,model,last_seen,wake_up_mode FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
         try execute("UPDATE sessions SET last_seen=? WHERE id=? AND last_seen<?", [now, row["session_id"]!, .number(Date().timeIntervalSince1970 - 5)])
         return sessionMetadata(row)
     }
@@ -155,11 +165,14 @@ public final class IntegrationRegistry: @unchecked Sendable {
             let model = args.object.keys.contains("model") ? args["model"].string : current["model"].string
             try validateSessionMetadata(label: label, model: model)
             try execute("UPDATE sessions SET label=?,model=?,last_seen=? WHERE id=?", [.string(label), model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null, now, current["session_id"]])
-            return try session(token)
+            if args.object.keys.contains("wake_up") { try configureWakeUp(sessionID: current["session_id"], configuration: args["wake_up"]) }
+            var result = try session(token).object
+            result["delivery"] = try receiverStatus(sessionID: current["session_id"])
+            return .object(result)
         }
     }
     public func registeredSessions() throws -> JSON {
-        let values = try rows("SELECT s.id AS session_id,s.client,s.label AS conversation_label,s.conversation_id,s.model,s.last_seen, r.receiver_id IS NOT NULL AS receiver_registered FROM sessions s LEFT JOIN receivers r ON r.session_id=s.id ORDER BY s.label COLLATE NOCASE,s.id")
+        let values = try rows("SELECT s.id AS session_id,s.client,s.label AS conversation_label,s.conversation_id,s.model,s.last_seen,s.wake_up_mode, r.receiver_id IS NOT NULL AS receiver_registered FROM sessions s LEFT JOIN receivers r ON r.session_id=s.id ORDER BY s.label COLLATE NOCASE,s.id")
         return .object(["sessions": .array(try values.map { row in
             var value = sessionMetadata(row).object
             value["documents"] = .array(try rows("SELECT d.id AS document_id,d.title,d.path FROM documents d JOIN bindings b ON b.document_id=d.id WHERE b.session_id=? ORDER BY d.title", [row["session_id"]!]).map(JSON.object))

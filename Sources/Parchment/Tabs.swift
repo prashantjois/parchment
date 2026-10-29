@@ -59,9 +59,10 @@ struct DocumentTab: View {
     private func attachmentStatus(_ session: JSON, _ request: JSON?) -> String {
         if let request {
             if request["last_error"].string != nil { return " — delivery failed; retrying" }
+            if session["receiver_registered"].int != 1 { return " — queued; waiting for agent" }
             return request["accepted_at"] == .null ? " — request pending" : " — queued; awaiting attachment"
         }
-        return session["receiver_registered"].int == 1 ? "" : " — receiver unavailable"
+        return session["receiver_registered"].int == 1 ? "" : " — automatic wake-up off"
     }
 
     var body: some View {
@@ -106,7 +107,6 @@ struct DocumentTab: View {
                         })) {
                             Text((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request))
                         }
-                        .disabled(!attached && request == nil && session["receiver_registered"].int != 1)
                         .help(request != nil ? "Cancel this attachment request" : attached ? "Detach this session from the file" : "Attach the file to this session")
                     }
                 }

@@ -121,7 +121,7 @@ if not path.exists():
     try:
         app = start_app()
         a = client()
-        first = a.tool("create_session", {"client": "Generic agent", "conversation_label": "Delivery checks"})
+        first = a.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Generic agent", "conversation_label": "Delivery checks"})
         agent_id = "existing-agent-session ' ; $(ignored) {message}"
         config = registration(first, agent_id)
         a.tool("register_receiver", dict(config, executable="relative"), error="INVALID_RECEIVER")
@@ -147,7 +147,7 @@ if not path.exists():
         local("test_submit_review", **ref, summary="Published review")
         delivered = accepted(1)[0]
         event = delivered["event"]
-        assert event["type"] == "parchment.feedback_available" and event["protocol_version"] == 1
+        assert event["type"] == "parchment.feedback_available" and event["protocol_version"] == 2
         assert event["agent_session_id"] == agent_id and event["session_id"] == first["session_id"]
         assert event["document_id"] == ref["document_id"] and event["binding_id"] == auth["binding_id"]
         assert delivered["args"] == [agent_id, event["message"], event["delivery_id"]]
@@ -193,7 +193,7 @@ if not path.exists():
         # Crash window: the receiver accepted, but the dispatcher did not commit its receipt.
         replay = max(messages(), key=lambda item: item["event"]["cursor"])["event"]
         with sqlite3.connect(state / "integration.sqlite") as database:
-            database.execute("UPDATE notifications SET accepted_at=NULL,lease_id='crashed',lease_until=? WHERE delivery_id=?", (time.time() - 1, replay["delivery_id"]))
+            database.execute("UPDATE event_wakeups SET accepted_at=NULL,lease_id='crashed',lease_until=? WHERE delivery_id=?", (time.time() - 1, replay["delivery_id"]))
         worker = start_worker()
         until(lambda: len(attempts()) == count + 2)
         until(lambda: a.tool("get_receiver_status", status_args)["accepted_notifications"] == 2)
@@ -205,7 +205,7 @@ if not path.exists():
         app = start_app()
 
         b = client()
-        second = b.tool("create_session", {"client": "Other framework", "conversation_label": "Receiving agent"})
+        second = b.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Other framework", "conversation_label": "Receiving agent"})
         second_config = registration(second, "other-agent-session")
         b.tool("register_receiver", second_config)
         mode.write_text("reject")
@@ -287,9 +287,9 @@ if not path.exists():
         stop(app); app = None
         mode.write_text("accept")
         worker = start_worker()
-        requested = until(lambda: next((item["event"] for item in messages() if item["event"]["delivery_id"] == request["request_id"]), None))
+        requested = until(lambda: next((item["event"] for item in messages() if item["event"]["attachment_request_id"] == request["request_id"]), None))
         assert requested["document_id"] == attach_doc["document_id"] and requested["session_id"] == second["session_id"]
-        assert requested["delivery_id"] == request["request_id"] and requested["binding_id"] is None
+        assert requested["attachment_request_id"] == request["request_id"] and requested["binding_id"] is None
         assert requested["cursor"] is None and second["session_token"] not in json.dumps(requested)
         assert requested["message"].startswith("🤖")
         app = start_app()
@@ -311,7 +311,7 @@ if not path.exists():
         transfer = local("test_request_attachment", **attach_ref, session_id=first["session_id"], transfer=True)
         assert b.tool("get_document", attach_ref)["attachment"]["session_id"] == second["session_id"]
         assert b.tool("attach_document", dict(attach_ref, session_token=second["session_token"]))["binding_id"] == bound["binding_id"]
-        accepted_transfer = until(lambda: next((item for item in messages() if item["event"]["delivery_id"] == transfer["request_id"]), None))
+        accepted_transfer = until(lambda: next((item for item in messages() if item["event"]["attachment_request_id"] == transfer["request_id"]), None))
         assert accepted_transfer["event"]["agent_session_id"] == agent_id
         moved = a.tool("attach_document", dict(attach_ref, session_token=first["session_token"], attachment_request_id=transfer["request_id"]))
         assert moved["generation"] == bound["generation"] + 1 and moved["binding_id"] != bound["binding_id"]
@@ -332,8 +332,8 @@ if not path.exists():
         fresh = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
         assert fresh["request_id"] != retry["request_id"]
         b.tool("attach_document", dict(attach_ref, session_token=second["session_token"], attachment_request_id=fresh["request_id"]))
-        unknown = a.tool("create_session", {"client": "Offline framework", "conversation_label": "No receiver"})
-        local("test_request_attachment", **attach_ref, session_id=unknown["session_id"], transfer=True, expected_error="RECEIVER_NOT_REGISTERED")
+        unknown = a.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Offline framework", "conversation_label": "No receiver"})
+        local("test_request_attachment", **attach_ref, session_id=unknown["session_id"], transfer=True)
         local("test_request_attachment", **attach_ref, session_id="missing", transfer=True, expected_error="SESSION_NOT_FOUND")
         print("PASS cancelled or outdated requests cannot steal ownership; new requests and missing receivers are handled")
         toggle_path = root / "session-toggle.md"

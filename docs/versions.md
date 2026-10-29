@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.32 | 33 | 2026-10-29 | Current release | Combined tab attachment menus into Sessions, with check marks and click actions to attach, detach, or cancel a request. |
+| 0.1.33 | 34 | 2026-10-29 | Current release | Combined session registration and wake-up configuration; added one durable event bus for attachment requests, comments, and reviews. |
+| 0.1.32 | 33 | 2026-10-29 | `28b72e5` | Combined tab attachment menus into Sessions, with check marks and click actions to attach, detach, or cancel a request. |
 | 0.1.31 | 32 | 2026-10-29 | `dafb15f` | Replaced the theme collection with twenty original styles, category browsing, descriptions, and automatic selection migration. |
 | 0.1.30 | 31 | 2026-10-29 | `a25ce7f` | Newly opened files always start in Rendered mode, including files previously closed in Raw or Split mode. |
 | 0.1.29 | 30 | 2026-10-29 | `68c16ec` | Added session names and models, metadata synchronization, and tab menus for session inspection, attachment requests, and confirmed transfers. |
@@ -37,6 +38,16 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.33
+
+- Session registration validates and saves identity and required wake-up settings in one call. Existing sessions can update delivery without changing credentials.
+- Attachment requests, published comments, replies, and submitted reviews use one durable session event bus and wake-up outbox.
+- New MCP tools read, wait for, and confirm handled session events. Authentication filters each inbox by session identity.
+- All registered sessions can receive attachment requests from the tab menu. Manual sessions collect queued events on their next turn.
+- Existing agent-side attachments retain their token and binding workflow. Pending reviews remain private, and wake-up acceptance never acknowledges feedback.
+- Migration preserves existing sessions, bindings, receiver commands, accepted delivery receipts, and retry IDs.
+- The skill checks the common inbox and avoids reclaiming detached files from stale notifications.
 
 ## 0.1.32
 

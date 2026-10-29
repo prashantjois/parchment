@@ -148,9 +148,9 @@ def main():
             assert legacy["session_id"] == "legacy-session" and legacy["model"] is None
             passed("version-one registry migrates without losing session identity")
             tools = a.request("tools/list")["tools"]
-            assert len(tools) == 20 and len({tool["name"] for tool in tools}) == 20
+            assert len(tools) == 23 and len({tool["name"] for tool in tools}) == 23
             a.tool("list_documents", error="APP_UNAVAILABLE")
-            a.tool("create_session", {"client": 42, "conversation_label": "bad"}, error="INVALID_ARGUMENT")
+            a.tool("create_session", {"wake_up": {"mode": "manual"}, "client": 42, "conversation_label": "bad"}, error="INVALID_ARGUMENT")
             passed("MCP initialization, schemas, and unavailable-app error")
             app = start_app()
             assert a.tool("open_app", {"activate": False})["app"] == "Parchment"
@@ -160,8 +160,8 @@ def main():
             document_path = root / "notes.md"
             original = "# Plan\n\nHello 🌎.\n\nChange this paragraph.\n\nRepeated repeated.\n"
             document_path.write_text(original)
-            first = a.tool("create_session", {"client": "Agent A", "conversation_label": "Original conversation"})
-            second = b.tool("create_session", {"client": "Agent B", "conversation_label": "Second conversation"})
+            first = a.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Agent A", "conversation_label": "Original conversation"})
+            second = b.tool("create_session", {"wake_up": {"mode": "manual"}, "client": "Agent B", "conversation_label": "Second conversation"})
             draft_id = initial[0]["document_id"]
             draft_binding = a.tool("attach_document", {"document_id": draft_id, "session_token": first["session_token"]})
             draft_auth = dict(session_token=first["session_token"], binding_id=draft_binding["binding_id"], generation=draft_binding["generation"])

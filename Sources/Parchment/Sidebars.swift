@@ -136,8 +136,8 @@ struct CommentsSidebar: View {
                             .help(document.integrationAttachment["delivery"]["last_error"].string ?? "")
                     } else {
                         Text(document.integrationAttachment["delivery"]["registered"].bool == true
-                             ? "Automatic feedback delivery enabled"
-                             : "Automatic feedback delivery is not configured")
+                             ? "Automatic agent wake-up enabled"
+                             : "Events wait in the agent’s inbox until its next turn")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Button("Disconnect Agent…") { disconnectAgent = true }.buttonStyle(.borderless).font(.caption).buttonFeedback("Disconnect this document from the attached agent conversation")
