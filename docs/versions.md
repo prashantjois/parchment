@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.31 | 32 | 2026-10-29 | Current release | Replaced the theme collection with twenty original styles, category browsing, descriptions, and automatic selection migration. |
+| 0.1.32 | 33 | 2026-10-29 | Current release | Combined tab attachment menus into Sessions, with check marks and click actions to attach, detach, or cancel a request. |
+| 0.1.31 | 32 | 2026-10-29 | `dafb15f` | Replaced the theme collection with twenty original styles, category browsing, descriptions, and automatic selection migration. |
 | 0.1.30 | 31 | 2026-10-29 | `a25ce7f` | Newly opened files always start in Rendered mode, including files previously closed in Raw or Split mode. |
 | 0.1.29 | 30 | 2026-10-29 | `68c16ec` | Added session names and models, metadata synchronization, and tab menus for session inspection, attachment requests, and confirmed transfers. |
 | 0.1.28 | 29 | 2026-10-28 | `fb61e02` | Fixed editing crashes during composed input and stabilized native editor and preview refresh layout. |
@@ -36,6 +37,13 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.32
+
+- The tab context menu has one Sessions submenu with all registered sessions. The attached session has a check mark.
+- Clicking a checked session detaches it. Clicking an unchecked session requests attachment. Clicking a pending request cancels it.
+- Transfers still require confirmation. Pending requests show delivery status until the receiving agent attaches.
+- Detachment works without a receiver and affects only the selected session, including when ownership changes while the menu is open.
 
 ## 0.1.31
 

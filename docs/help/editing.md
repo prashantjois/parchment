@@ -12,7 +12,7 @@ Drag a tab to reorder it. The insertion marker shows the drop position before or
 
 Right-click a tab for **Add File Comment**, **Close Tab**, **Close Tabs Before**, **Close Tabs After**, or **Close All Tabs**. Add File Comment opens the composer for the clicked tab, even when another tab is active. Before and After refer to the clicked tab in the current tab order. These actions preserve the existing save prompts. If you cancel a prompt or a save fails, bulk closing stops. Tabs already closed remain closed.
 
-Right-click a tab and open **Attached Sessions** to see its owner, session name, model, and ID. Use **Attach to Session** to request attachment to an existing registered session. The session must have an automatic receiver. The menu shows pending requests and lets you cancel them.
+Right-click a tab and open **Sessions** to see registered sessions with their names, models, and short IDs. A check mark identifies the attached session. Click a checked session to detach it. Click an unchecked session to request attachment. New attachments need an automatic receiver; an attached session can detach without one. Pending requests show their status. Click a pending request again to cancel it.
 
 Each file has one owner. Choosing another session asks for transfer confirmation. The current owner stays attached until the receiving agent accepts. Unhandled feedback follows the transfer.
 

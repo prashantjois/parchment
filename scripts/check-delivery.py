@@ -336,6 +336,29 @@ if not path.exists():
         local("test_request_attachment", **attach_ref, session_id=unknown["session_id"], transfer=True, expected_error="RECEIVER_NOT_REGISTERED")
         local("test_request_attachment", **attach_ref, session_id="missing", transfer=True, expected_error="SESSION_NOT_FOUND")
         print("PASS cancelled or outdated requests cannot steal ownership; new requests and missing receivers are handled")
+        toggle_path = root / "session-toggle.md"
+        toggle_path.write_text("# Toggle attachment\n")
+        toggle_doc = a.tool("open_document", {"path": str(toggle_path), "activate": False})
+        toggle_ref = {"document_id": toggle_doc["document_id"]}
+        state = local("test_set_session", **toggle_ref, session_id=first["session_id"], attached=True)
+        assert state["attachment"]["status"] == "unattached" and len(state["requests"]) == 1
+        cancelled_id = state["requests"][0]["request_id"]
+        state = local("test_set_session", **toggle_ref, session_id=first["session_id"], attached=True)
+        assert state["requests"] == [] and state["attachment"]["status"] == "unattached"
+        a.tool("attach_document", dict(toggle_ref, session_token=first["session_token"], attachment_request_id=cancelled_id), error="STALE_ATTACHMENT_REQUEST")
+        state = local("test_set_session", **toggle_ref, session_id=first["session_id"], attached=True)
+        on = a.tool("attach_document", dict(toggle_ref, session_token=first["session_token"], attachment_request_id=state["requests"][0]["request_id"]))
+        a.tool("unregister_receiver", {"session_token": first["session_token"]})
+        state = local("test_set_session", **toggle_ref, session_id=first["session_id"], attached=False)
+        assert state["attachment"]["status"] == "unattached"
+        a.tool("get_feedback", dict(session_token=first["session_token"], binding_id=on["binding_id"], generation=on["generation"]), error="STALE_BINDING")
+        b.tool("attach_document", dict(toggle_ref, session_token=second["session_token"]))
+        state = local("test_set_session", **toggle_ref, session_id=first["session_id"], attached=False)
+        assert state["attachment"]["session_id"] == second["session_id"]
+        state = local("test_set_session", **toggle_ref, session_id=second["session_id"], attached=False)
+        assert state["attachment"]["status"] == "unattached"
+        assert any(item["session_id"] == first["session_id"] for item in a.tool("list_sessions")["sessions"])
+        print("PASS session menu toggles request, cancel, and detach; stale toggles preserve another owner and offline owners remain detachable")
         print("All agent delivery checks passed.")
     except Exception:
         log.flush(); log.seek(0); print(log.read())

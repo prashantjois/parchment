@@ -103,9 +103,9 @@ Document lookup can reopen a closed saved file. Unsaved documents use IDs and mu
 
 ## Attach from a tab
 
-Right-click a tab and open **Attached Sessions** to see its owner, name, model, and session ID. Open **Attach to Session** to choose another registered session. Sessions without a receiver appear unavailable.
+Right-click a tab and open **Sessions** to see registered sessions with their names, models, and short IDs. The attached session has a check mark. Click it to detach. Click an unchecked session to request attachment. Sessions without a receiver cannot receive new attachment requests, but an attached session can still detach.
 
-Parchment queues an attachment request through the selected session's existing receiver. The menu shows pending, queued, and failed delivery states. Failed deliveries retry. Use **Cancel Attachment Request** to withdraw a pending request.
+Parchment queues an attachment request through the selected session's existing receiver. The menu shows pending, queued, and failed delivery states. Failed deliveries retry. Click a pending session again to cancel its request. Check marks appear after the agent attaches.
 
 A document keeps one owner. If it already has an owner, Parchment asks for an explicit transfer confirmation. The current owner remains attached until the receiving agent accepts. Unhandled feedback carries over after transfer.
 

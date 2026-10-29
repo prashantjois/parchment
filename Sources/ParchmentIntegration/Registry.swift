@@ -229,6 +229,14 @@ public final class IntegrationRegistry: @unchecked Sendable {
     public func releaseDocument(_ documentID: String) throws {
         try transaction { try releaseDocumentBinding(documentID) }
     }
+    /// A menu toggle affects only the chosen session, even if ownership changed.
+    public func disconnectSession(documentID: String, sessionID: String) throws {
+        try transaction {
+            let owner = try rows("SELECT session_id FROM bindings WHERE document_id=?", [.string(documentID)]).first?["session_id"]
+            if owner?.string == sessionID { try releaseDocumentBinding(documentID) }
+            else { try cancelAttachmentRequest(documentID: documentID, sessionID: sessionID) }
+        }
+    }
     private func releaseDocumentBinding(_ documentID: String) throws {
         try execute("UPDATE attachment_requests SET state='cancelled',lease_id=NULL,lease_until=0 WHERE document_id=? AND state='pending'", [.string(documentID)])
         try execute("UPDATE bindings SET binding_id=?,session_id=NULL,generation=generation+1,delivered=acknowledged,last_activity=? WHERE document_id=?", [.string(UUID().uuidString), now, .string(documentID)])

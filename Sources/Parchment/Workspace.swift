@@ -38,7 +38,7 @@ enum DocumentSaveError: LocalizedError {
     @Published var integrationSessions: [JSON] = []
     @Published var integrationRequests: [JSON] = []
     var requestAgentAttachment: ((String) -> Void)?
-    var cancelAgentAttachment: ((String) -> Void)?
+    var setAgentSessionAttached: ((String, Bool) -> Void)?
     @Published var integrationError: String?
     var disconnectAgent: (() -> Void)?
     var agentTextDelegate: AgentTextDelegate?

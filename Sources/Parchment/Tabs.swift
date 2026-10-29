@@ -93,34 +93,21 @@ struct DocumentTab: View {
                                                                        width: width, edge: $dropEdge))
             .contextMenu {
                 Button("Add File Comment", action: comment)
-                Menu("Attached Sessions") {
-                    if document.integrationAttachment["status"].string == "attached" {
-                        Text(document.integrationAttachment["display_name"].string ?? "Agent session")
-                        Text("Session ID: \(document.integrationAttachment["session_id"].string ?? "")")
-                    } else {
-                        Text("No attached sessions")
-                    }
-                }
-                Menu("Attach to Session") {
-                    let candidates = document.integrationSessions.filter { $0["session_id"] != document.integrationAttachment["session_id"] }
-                    if candidates.isEmpty { Text("No other registered sessions") }
-                    ForEach(candidates.indices, id: \.self) { index in
-                        let session = candidates[index]
+                Menu("Sessions") {
+                    if document.integrationSessions.isEmpty { Text("No registered sessions") }
+                    ForEach(document.integrationSessions.indices, id: \.self) { index in
+                        let session = document.integrationSessions[index]
+                        let attached = document.integrationAttachment["session_id"] == session["session_id"]
                         let request = document.integrationRequests.first { $0["session_id"] == session["session_id"] }
-                        if request != nil {
-                            Menu((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request)) {
-                                Button("Cancel Attachment Request") {
-                                    if let id = session["session_id"].string { document.cancelAgentAttachment?(id) }
-                                }
-                            }
-                        } else {
-                            Button {
-                                if let id = session["session_id"].string { document.requestAgentAttachment?(id) }
-                            } label: {
-                                Text((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request))
-                            }
-                            .disabled(session["receiver_registered"].int != 1)
+                        Toggle(isOn: Binding(get: {
+                            document.integrationAttachment["session_id"] == session["session_id"]
+                        }, set: { enabled in
+                            if let id = session["session_id"].string { document.setAgentSessionAttached?(id, enabled) }
+                        })) {
+                            Text((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request))
                         }
+                        .disabled(!attached && request == nil && session["receiver_registered"].int != 1)
+                        .help(request != nil ? "Cancel this attachment request" : attached ? "Detach this session from the file" : "Attach the file to this session")
                     }
                 }
                 Divider()

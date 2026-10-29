@@ -76,11 +76,17 @@ import ParchmentIntegration
                 self.refreshAttachments()
             } catch { self.workspace?.error = error.localizedDescription }
         }
-        document.cancelAgentAttachment = { [weak self, weak document] sessionID in
+        document.setAgentSessionAttached = { [weak self, weak document] sessionID, enabled in
             guard let self, let document else { return }
             do {
-                try self.registry.cancelAttachmentRequest(documentID: document.id.uuidString, sessionID: sessionID)
-                self.refreshAttachments()
+                let pending = try self.registry.attachmentRequests(documentID: document.id.uuidString).array
+                    .contains { $0["session_id"].string == sessionID }
+                if !enabled || pending {
+                    try self.registry.disconnectSession(documentID: document.id.uuidString, sessionID: sessionID)
+                    self.refreshAttachments()
+                } else {
+                    document.requestAgentAttachment?(sessionID)
+                }
             } catch { self.workspace?.error = error.localizedDescription }
         }
         document.integrationAttachment = try registry.attachment(document.id.uuidString)
@@ -281,6 +287,9 @@ import ParchmentIntegration
         if method == "test_shutdown" { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { exit(0) }; return .bool(true) }
         let document = try self.document(args)
         switch method {
+        case "test_set_session":
+            document.setAgentSessionAttached?(try args.require("session_id"), args["attached"].bool ?? false)
+            return .object(["attachment": try registry.attachment(document.id.uuidString), "requests": try registry.attachmentRequests(documentID: document.id.uuidString)])
         case "test_cancel_attachment": try registry.cancelAttachmentRequest(documentID: document.id.uuidString, sessionID: args.require("session_id")); return .bool(true)
         case "test_request_attachment": return try registry.requestAttachment(documentID: document.id.uuidString, sessionID: args.require("session_id"), transfer: args["transfer"].bool ?? false)
         case "test_file_comment": document.addComment(body: try args.require("body"), pending: args["pending"].bool ?? false, fileLevel: true)
