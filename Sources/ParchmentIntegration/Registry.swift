@@ -19,7 +19,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
         chmod(path, 0o600); sqlite3_busy_timeout(db, 5000)
         try execute("PRAGMA journal_mode=WAL"); try execute("PRAGMA synchronous=FULL"); try execute("PRAGMA foreign_keys=ON")
         let version = try rows("PRAGMA user_version").first?["user_version"]?.int ?? 0
-        guard version <= 1 else { throw BridgeError("REGISTRY_VERSION_UNSUPPORTED", "This registry requires a newer Parchment version.") }
+        guard version <= 2 else { throw BridgeError("REGISTRY_VERSION_UNSUPPORTED", "This registry requires a newer Parchment version.") }
         try transaction {
             try execute("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, client TEXT NOT NULL, label TEXT NOT NULL, conversation_id TEXT, last_seen REAL NOT NULL)")
             try execute("CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, path TEXT UNIQUE, identity TEXT, title TEXT NOT NULL, updated REAL NOT NULL)")
@@ -32,7 +32,11 @@ public final class IntegrationRegistry: @unchecked Sendable {
             try execute("CREATE TABLE IF NOT EXISTS receivers (session_id TEXT PRIMARY KEY REFERENCES sessions(id), receiver_id TEXT NOT NULL UNIQUE, agent_session_id TEXT NOT NULL, executable TEXT NOT NULL, arguments TEXT NOT NULL)")
             try execute("CREATE TABLE IF NOT EXISTS notifications (delivery_id TEXT PRIMARY KEY, receiver_id TEXT NOT NULL REFERENCES receivers(receiver_id) ON DELETE CASCADE, document_id TEXT NOT NULL REFERENCES documents(id), binding_id TEXT NOT NULL, generation INTEGER NOT NULL, sequence INTEGER NOT NULL REFERENCES feedback(sequence), attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, lease_id TEXT, lease_until REAL NOT NULL DEFAULT 0, accepted_at REAL, last_error TEXT, UNIQUE(receiver_id,binding_id,sequence))")
             try execute("CREATE INDEX IF NOT EXISTS notification_due ON notifications(accepted_at,next_attempt,lease_until)")
-            try execute("PRAGMA user_version=1")
+            if !(try rows("PRAGMA table_info(sessions)")).contains(where: { $0["name"]?.string == "model" }) {
+                try execute("ALTER TABLE sessions ADD COLUMN model TEXT")
+            }
+            try execute("CREATE TABLE IF NOT EXISTS attachment_requests (request_id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id), session_id TEXT NOT NULL REFERENCES sessions(id), state TEXT NOT NULL DEFAULT 'pending', expected_binding_id TEXT, created REAL NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, lease_id TEXT, lease_until REAL NOT NULL DEFAULT 0, accepted_at REAL, last_error TEXT, UNIQUE(document_id,session_id))")
+            try execute("PRAGMA user_version=2")
         }
     }
     deinit { sqlite3_close(db) }
@@ -114,29 +118,82 @@ public final class IntegrationRegistry: @unchecked Sendable {
     public func documentAtPath(_ path: String) throws -> JSON? {
         try rows("SELECT id AS document_id,path,title FROM documents WHERE path=?", [.string(Self.canonicalPath(path))]).first.map(JSON.object)
     }
-    public func createSession(client: String, label: String, conversationID: String?) throws -> JSON {
+    private func validateSessionMetadata(label: String, model: String?) throws {
+        guard !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, label.utf8.count <= 1024,
+              !label.contains("\0"), (model?.utf8.count ?? 0) <= 1024, model?.contains("\0") != true else {
+            throw BridgeError("INVALID_ARGUMENT", "Use a nonempty session name and optional model, each at most 1 KB.")
+        }
+    }
+    public static func sessionDisplayName(_ session: JSON) -> String {
+        [session["conversation_label"].string ?? "Agent session", session["model"].string,
+         session["client"].string, session["session_id"].string.map { String($0.prefix(8)) }]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+    private func sessionMetadata(_ row: [String: JSON]) -> JSON {
+        var value = row
+        value["display_name"] = .string(Self.sessionDisplayName(.object(row)))
+        return .object(value)
+    }
+    public func createSession(client: String, label: String, conversationID: String?, model: String? = nil) throws -> JSON {
+        try validateSessionMetadata(label: label, model: model)
         let id = UUID().uuidString, token = UUID().uuidString + UUID().uuidString
-        try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen) VALUES(?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now])
-        return .object(["session_id": .string(id), "session_token": .string(token), "conversation_label": .string(label), "instructions": .string("Keep this session_token in this conversation. Reuse it after reconnecting; do not create a new session for every tool call.")])
+        try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen,model) VALUES(?,?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now, model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null])
+        var result = try session(token).object
+        result["session_token"] = .string(token)
+        result["instructions"] = .string("Keep this token in this conversation. Resume it and compare the session name and model with the current runtime. Use update_session to synchronize changes without replacing this identity.")
+        return .object(result)
     }
     public func session(_ token: String) throws -> JSON {
-        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
+        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id,model,last_seen FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
         try execute("UPDATE sessions SET last_seen=? WHERE id=? AND last_seen<?", [now, row["session_id"]!, .number(Date().timeIntervalSince1970 - 5)])
-        return .object(row)
+        return sessionMetadata(row)
+    }
+    public func updateSession(_ args: JSON) throws -> JSON {
+        try transaction {
+            let token = try args.require("session_token"), current = try session(token)
+            let label = try args["conversation_label"].string ?? current.require("conversation_label")
+            let model = args.object.keys.contains("model") ? args["model"].string : current["model"].string
+            try validateSessionMetadata(label: label, model: model)
+            try execute("UPDATE sessions SET label=?,model=?,last_seen=? WHERE id=?", [.string(label), model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null, now, current["session_id"]])
+            return try session(token)
+        }
+    }
+    public func registeredSessions() throws -> JSON {
+        let values = try rows("SELECT s.id AS session_id,s.client,s.label AS conversation_label,s.conversation_id,s.model,s.last_seen, r.receiver_id IS NOT NULL AS receiver_registered FROM sessions s LEFT JOIN receivers r ON r.session_id=s.id ORDER BY s.label COLLATE NOCASE,s.id")
+        return .object(["sessions": .array(try values.map { row in
+            var value = sessionMetadata(row).object
+            value["documents"] = .array(try rows("SELECT d.id AS document_id,d.title,d.path FROM documents d JOIN bindings b ON b.document_id=d.id WHERE b.session_id=? ORDER BY d.title", [row["session_id"]!]).map(JSON.object))
+            return .object(value)
+        })])
     }
     public func attachment(_ documentID: String) throws -> JSON {
-        guard let row = try rows("SELECT b.session_id,b.generation,b.acknowledged,s.client,s.label,s.last_seen FROM bindings b LEFT JOIN sessions s ON s.id=b.session_id WHERE b.document_id=?", [.string(documentID)]).first, row["session_id"] != .null else { return .object(["status": .string("unattached")]) }
+        guard let row = try rows("SELECT b.session_id,b.generation,b.acknowledged,s.client,s.label,s.model,s.last_seen FROM bindings b LEFT JOIN sessions s ON s.id=b.session_id WHERE b.document_id=?", [.string(documentID)]).first, row["session_id"] != .null else { return .object(["status": .string("unattached")]) }
         let queued = try rows("SELECT COUNT(*) AS count FROM feedback WHERE document_id=? AND sequence>?", [.string(documentID), row["acknowledged"] ?? .integer(0)]).first?["count"] ?? .integer(0)
-        return .object(["status": .string("attached"), "session_id": row["session_id"]!, "generation": row["generation"]!, "client": row["client"] ?? .null, "conversation_label": row["label"] ?? .null, "last_seen": row["last_seen"] ?? .null, "queued_feedback": queued, "delivery": try receiverStatus(sessionID: row["session_id"]!)])
+        return .object(["status": .string("attached"), "session_id": row["session_id"]!, "generation": row["generation"]!, "client": row["client"] ?? .null, "conversation_label": row["label"] ?? .null, "model": row["model"] ?? .null, "display_name": .string(Self.sessionDisplayName(.object(["session_id": row["session_id"]!, "client": row["client"] ?? .null, "conversation_label": row["label"] ?? .null, "model": row["model"] ?? .null]))), "last_seen": row["last_seen"] ?? .null, "queued_feedback": queued, "delivery": try receiverStatus(sessionID: row["session_id"]!)])
     }
-    public func attach(documentID: String, sessionToken: String) throws -> JSON {
+    public func attach(documentID: String, sessionToken: String, requestID: String? = nil) throws -> JSON {
         try transaction {
             _ = try document(documentID)
             let session = try self.session(sessionToken), sessionID = try session.require("session_id")
-            let previous = try rows("SELECT * FROM bindings WHERE document_id=?", [.string(documentID)]).first
+            var previous = try rows("SELECT * FROM bindings WHERE document_id=?", [.string(documentID)]).first
+            if let requestID {
+                guard let request = try rows("SELECT * FROM attachment_requests WHERE request_id=? AND document_id=? AND session_id=?", [.string(requestID), .string(documentID), .string(sessionID)]).first,
+                      (request["state"]?.string == "pending" && request["expected_binding_id"] == (previous?["binding_id"] ?? .null)) ||
+                      (request["state"]?.string == "attached" && previous?["session_id"]?.string == sessionID) else {
+                    throw BridgeError("STALE_ATTACHMENT_REQUEST", "The attachment request was cancelled or ownership changed. Ask the user to choose the session again.")
+                }
+                if let previousOwner = previous?["session_id"]?.string, previousOwner != sessionID {
+                    try execute("UPDATE bindings SET binding_id=?,session_id=?,generation=generation+1,delivered=acknowledged,last_activity=? WHERE document_id=?", [.string(UUID().uuidString), .string(sessionID), now, .string(documentID)])
+                    previous = try rows("SELECT * FROM bindings WHERE document_id=?", [.string(documentID)]).first
+                }
+            }
             if let previous, let owner = previous["session_id"]?.string, owner != sessionID {
                 throw BridgeError("DOCUMENT_ALREADY_ATTACHED", "Another conversation owns this document. Request an explicit handoff; attachments never replace another owner.", details: try attachment(documentID))
             }
+            if previous?["session_id"]?.string != sessionID || requestID != nil {
+                try execute("UPDATE attachment_requests SET state='cancelled',lease_id=NULL,lease_until=0 WHERE document_id=? AND session_id!=? AND state='pending'", [.string(documentID), .string(sessionID)])
+            }
+            try execute("UPDATE attachment_requests SET state='attached',lease_id=NULL,lease_until=0 WHERE document_id=? AND session_id=?", [.string(documentID), .string(sessionID)])
             if previous?["session_id"]?.string == sessionID { return .object(previous!) }
             let generation = (previous?["generation"]?.int ?? 0) + 1, bindingID = UUID().uuidString
             try execute("INSERT INTO bindings(document_id,binding_id,session_id,generation,last_activity) VALUES(?,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET binding_id=excluded.binding_id,session_id=excluded.session_id,generation=excluded.generation,delivered=bindings.acknowledged,last_activity=excluded.last_activity", [.string(documentID), .string(bindingID), .string(sessionID), .integer(generation), now])
@@ -156,6 +213,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
             let binding = try validateBinding(args), target = try args.require("target_session_id")
             guard !(try rows("SELECT id FROM sessions WHERE id=?", [.string(target)])).isEmpty else { throw BridgeError("SESSION_NOT_FOUND", "The receiving conversation must create a session first.") }
             if binding["session_id"].string == target { return binding }
+            try execute("UPDATE attachment_requests SET state='cancelled',lease_id=NULL,lease_until=0 WHERE document_id=? AND state='pending'", [binding["document_id"]])
             try execute("UPDATE bindings SET binding_id=?,session_id=?,generation=generation+1,delivered=acknowledged,last_activity=? WHERE document_id=?", [.string(UUID().uuidString), .string(target), now, binding["document_id"]])
             return try attachment(binding.require("document_id"))
         }
@@ -163,12 +221,16 @@ public final class IntegrationRegistry: @unchecked Sendable {
     public func detach(_ args: JSON) throws -> JSON {
         try transaction {
             let binding = try validateBinding(args)
-            try releaseDocument(binding.require("document_id"))
+            try releaseDocumentBinding(binding.require("document_id"))
             return .object(["detached": .bool(true), "document_id": binding["document_id"]])
         }
     }
     /// Only the app's explicit user action can release an unavailable owner.
     public func releaseDocument(_ documentID: String) throws {
+        try transaction { try releaseDocumentBinding(documentID) }
+    }
+    private func releaseDocumentBinding(_ documentID: String) throws {
+        try execute("UPDATE attachment_requests SET state='cancelled',lease_id=NULL,lease_until=0 WHERE document_id=? AND state='pending'", [.string(documentID)])
         try execute("UPDATE bindings SET binding_id=?,session_id=NULL,generation=generation+1,delivered=acknowledged,last_activity=? WHERE document_id=?", [.string(UUID().uuidString), now, .string(documentID)])
     }
     public func enqueue(documentID: String, eventID: String, payload: JSON) throws {

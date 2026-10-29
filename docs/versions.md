@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.28 | 29 | 2026-10-28 | Current release | Fixed editing crashes during composed input and stabilized native editor and preview refresh layout. |
+| 0.1.29 | 30 | 2026-10-29 | Current release | Added session names and models, metadata synchronization, and tab menus for session inspection, attachment requests, and confirmed transfers. |
+| 0.1.28 | 29 | 2026-10-28 | `fb61e02` | Fixed editing crashes during composed input and stabilized native editor and preview refresh layout. |
 | 0.1.27 | 28 | 2026-10-28 | `24db304` | Changed installer version selection to local releases with numeric ordering and architecture filtering. |
 | 0.1.26 | 27 | 2026-10-28 | `4a0aaae` | Enabled Markdown association by default and added an installer version prompt with latest as its default. |
 | 0.1.25 | 26 | 2026-10-28 | `2c0576f` | Moved tab hover prompts below tabs, repaired Open Recent, and added app-wide System, Light, and Dark appearance. |
@@ -33,6 +34,16 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.29
+
+- Session display names include the session name, optional model, client, and a short stable ID.
+- New MCP tools update session metadata in place and list registered sessions with their attached files.
+- The Parchment skill checks session names and models at each turn or reconnection and synchronizes changes.
+- Tab context menus show the attached owner and request attachment to another registered session through its existing receiver.
+- Each file keeps one owner. Transfers require confirmation and complete when the receiving agent attaches with its own token.
+- Attachment requests support durable retries, pending status, cancellation, and checks that reject delayed requests after ownership changes.
+- Registry migration preserves existing session identities, tokens, attachments, feedback, and receivers.
 
 ## 0.1.28
 

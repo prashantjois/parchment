@@ -35,6 +35,10 @@ enum DocumentSaveError: LocalizedError {
     @Published var browserRoot: URL { willSet { if newValue != browserRoot { onNavigate?() } } }
     @Published var browserExpanded: Set<String> = []
     @Published var integrationAttachment: JSON = .object(["status": .string("unattached")])
+    @Published var integrationSessions: [JSON] = []
+    @Published var integrationRequests: [JSON] = []
+    var requestAgentAttachment: ((String) -> Void)?
+    var cancelAgentAttachment: ((String) -> Void)?
     @Published var integrationError: String?
     var disconnectAgent: (() -> Void)?
     var agentTextDelegate: AgentTextDelegate?

@@ -67,13 +67,16 @@ if not path.exists():
         clients.append(value)
         return value
 
-    def local(method, **params):
+    def local(method, expected_error=None, **params):
         with socket.socket(socket.AF_UNIX) as connection:
             connection.settimeout(10)
             connection.connect(str(socket_root / "app.sock"))
             connection.sendall((json.dumps({"method": method, "params": params}) + "\n").encode())
             with connection.makefile("r") as stream:
                 response = json.loads(stream.readline())
+        if expected_error:
+            assert not response["ok"] and response["error"]["code"] == expected_error, response
+            return response["error"]
         assert response["ok"], response
         return response["result"]
 
@@ -270,6 +273,69 @@ if not path.exists():
         until(exited)
         b.tool("unregister_receiver", second_status)
         print("PASS a stalled receiver is forcibly stopped and leaves feedback queued for retry")
+        # A tab can request attachment before any document binding or feedback exists.
+        b.tool("register_receiver", second_config)
+        attach_path = root / "attach-from-tab.md"
+        attach_path.write_text("# Attach me\n")
+        attach_doc = b.tool("open_document", {"path": str(attach_path), "activate": False})
+        attach_ref = {"document_id": attach_doc["document_id"]}
+        mode.write_text("reject")
+        request = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
+        repeat = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
+        assert request["request_id"] == repeat["request_id"]
+        until(lambda: b.tool("get_receiver_status", second_status)["last_error"])
+        stop(app); app = None
+        mode.write_text("accept")
+        worker = start_worker()
+        requested = until(lambda: next((item["event"] for item in messages() if item["event"]["delivery_id"] == request["request_id"]), None))
+        assert requested["document_id"] == attach_doc["document_id"] and requested["session_id"] == second["session_id"]
+        assert requested["delivery_id"] == request["request_id"] and requested["binding_id"] is None
+        assert requested["cursor"] is None and second["session_token"] not in json.dumps(requested)
+        assert requested["message"].startswith("🤖")
+        app = start_app()
+        b.tool("attach_document", dict(attach_ref, session_token=first["session_token"], attachment_request_id=request["request_id"]), error="STALE_ATTACHMENT_REQUEST")
+        bound = b.tool("attach_document", dict(attach_ref, session_token=second["session_token"], attachment_request_id=request["request_id"]))
+        attach_auth = dict(session_token=second["session_token"], binding_id=bound["binding_id"], generation=bound["generation"])
+        assert b.tool("get_feedback", attach_auth)["events"] == []
+        assert local("test_request_attachment", **attach_ref, session_id=second["session_id"])["status"] == "attached"
+        metadata_receiver_id = b.tool("get_receiver_status", second_status)["receiver_id"]
+        renamed = b.tool("update_session", dict(second_status, conversation_label="Live renamed session", model="New model"))
+        assert renamed["session_id"] == second["session_id"]
+        assert b.tool("get_receiver_status", second_status)["receiver_id"] == metadata_receiver_id
+        assert b.tool("register_receiver", second_config)["receiver_id"] == metadata_receiver_id
+        print("PASS tab attachment requests retry after restart, deduplicate, preserve credentials, and attach without fake feedback")
+        # Explicit transfer keeps the owner until acceptance, then invalidates its credentials.
+        a.tool("register_receiver", config)
+        local("test_comment", **attach_ref, quote="Attach", body="Feedback follows the transfer", pending=False)
+        local("test_request_attachment", **attach_ref, session_id=first["session_id"], expected_error="DOCUMENT_ALREADY_ATTACHED")
+        transfer = local("test_request_attachment", **attach_ref, session_id=first["session_id"], transfer=True)
+        assert b.tool("get_document", attach_ref)["attachment"]["session_id"] == second["session_id"]
+        assert b.tool("attach_document", dict(attach_ref, session_token=second["session_token"]))["binding_id"] == bound["binding_id"]
+        accepted_transfer = until(lambda: next((item for item in messages() if item["event"]["delivery_id"] == transfer["request_id"]), None))
+        assert accepted_transfer["event"]["agent_session_id"] == agent_id
+        moved = a.tool("attach_document", dict(attach_ref, session_token=first["session_token"], attachment_request_id=transfer["request_id"]))
+        assert moved["generation"] == bound["generation"] + 1 and moved["binding_id"] != bound["binding_id"]
+        b.tool("get_feedback", attach_auth, error="STALE_BINDING")
+        transfer_auth = dict(session_token=first["session_token"], binding_id=moved["binding_id"], generation=moved["generation"])
+        assert a.tool("get_feedback", transfer_auth)["events"]
+        assert a.tool("attach_document", dict(attach_ref, session_token=first["session_token"], attachment_request_id=transfer["request_id"]))["binding_id"] == moved["binding_id"]
+        print("PASS confirmed tab transfer keeps the owner until acceptance, preserves feedback, and rejects stale bindings")
+
+        # Cancelling a queued request makes a delayed agent notification harmless.
+        cancelled = local("test_request_attachment", **attach_ref, session_id=second["session_id"], transfer=True)
+        local("test_cancel_attachment", **attach_ref, session_id=second["session_id"])
+        b.tool("attach_document", dict(attach_ref, session_token=second["session_token"], attachment_request_id=cancelled["request_id"]), error="STALE_ATTACHMENT_REQUEST")
+        retry = local("test_request_attachment", **attach_ref, session_id=second["session_id"], transfer=True)
+        assert retry["request_id"] != cancelled["request_id"]
+        a.tool("detach_document", transfer_auth)
+        b.tool("attach_document", dict(attach_ref, session_token=second["session_token"], attachment_request_id=retry["request_id"]), error="STALE_ATTACHMENT_REQUEST")
+        fresh = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
+        assert fresh["request_id"] != retry["request_id"]
+        b.tool("attach_document", dict(attach_ref, session_token=second["session_token"], attachment_request_id=fresh["request_id"]))
+        unknown = a.tool("create_session", {"client": "Offline framework", "conversation_label": "No receiver"})
+        local("test_request_attachment", **attach_ref, session_id=unknown["session_id"], transfer=True, expected_error="RECEIVER_NOT_REGISTERED")
+        local("test_request_attachment", **attach_ref, session_id="missing", transfer=True, expected_error="SESSION_NOT_FOUND")
+        print("PASS cancelled or outdated requests cannot steal ownership; new requests and missing receivers are handled")
         print("All agent delivery checks passed.")
     except Exception:
         log.flush(); log.seek(0); print(log.read())

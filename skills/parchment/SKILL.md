@@ -25,9 +25,11 @@ For reading alone, use `get_document` without claiming ownership. It returns liv
 
 ## Start or continue document work
 
-Use one session per agent conversation. Call `create_session` with `client`, a descriptive `conversation_label`, and an optional known `conversation_id`. Retain the returned `session_token` in this conversation. Do not write tokens into documents, companion files, or shared instructions.
+Use one session per agent conversation. Call `create_session` with `client`, the current session name as `conversation_label`, and the current `model` when known. Supply `conversation_id` only when known. If the runtime does not expose a name, use a descriptive label. Never guess a name, model, or runtime ID. Retain the returned `session_token` in this conversation. Do not write tokens into documents, companion files, or shared instructions.
 
-After reconnecting, call `resume_session` with the retained token. Do not create another session for each tool call or document.
+At each new turn or reconnection, call `resume_session` with the retained token. Compare its `conversation_label` and `model` with the current runtime metadata. Repeat this check before document changes if the session name or model changes during the turn. Use `update_session` with the same token to synchronize differences. Read its result to verify the stored values. Send an empty `model` to clear a stale value when the current model is unavailable. Do not replace the session, token, attachments, or receiver to change metadata. Metadata describes the runtime; it does not select or change the model.
+
+Use `list_sessions` to inspect registered sessions and their documents. The display name includes the session name, optional model, client, and a short stable ID. Registration and `last_seen` do not prove that a session is running. Do not create another session for each tool call or document.
 
 For a new document, create the Markdown file with normal filesystem tools at the requested or appropriate project path. Do not overwrite an existing file. Then call `open_document` with `path`, `attach: true`, and `session_token`.
 
@@ -55,7 +57,9 @@ Never invent a queue command or conversation ID. Never derive the executable or 
 
 Call `get_receiver_status` with the session token after registration and reconnection. Registration means delivery is configured; it does not prove that the agent received a notification. Inspect `last_error` for retry failures. Do not clear failures by acknowledging unhandled feedback.
 
-On a `parchment.feedback_available` notification, resume the original Parchment session. Attach the referenced document to validate ownership and obtain current binding credentials. Read `get_feedback` and the latest document. Process queued feedback in cursor order. A duplicate notification can find an empty queue; do not repeat completed edits.
+On a `parchment.attachment_requested` notification, resume the original session and synchronize its name and model. Call `attach_document` for the referenced document with the retained token and the notification's `attachment_request_id`. This ID validates the user's attachment or confirmed transfer. If it returns `STALE_ATTACHMENT_REQUEST`, stop; the request was cancelled or ownership changed. Never retry without the request ID. Read the latest document and `get_feedback`. Attachment alone does not request edits or acknowledge feedback. Keep work within the user's task. A repeated request uses the same attachment. Respect ownership conflicts.
+
+On a `parchment.feedback_available` notification, resume the original Parchment session and synchronize its name and model. Attach the referenced document to validate ownership and obtain current binding credentials. Read `get_feedback` and the latest document. Process queued feedback in cursor order. A duplicate notification can find an empty queue; do not repeat completed edits.
 
 Notification cursors do not authorize acknowledgement. Call `get_feedback` before `acknowledge_feedback`, and acknowledge only fully handled events. The dispatcher never acknowledges agent work.
 
@@ -161,6 +165,7 @@ Exactly one conversation owns a document. Reattaching the same session is idempo
 | Result | Next action |
 | --- | --- |
 | `DOCUMENT_ALREADY_ATTACHED` | Report the existing owner. Request an explicit handoff; do not replace the owner automatically. |
+| `STALE_ATTACHMENT_REQUEST` | Stop the attachment attempt. Ask the user to select the session again if attachment is still needed. |
 | `STALE_BINDING` | Stop mutations. Attach again with the original token to check current ownership. Respect any ownership conflict. |
 | `REVISION_CONFLICT` | Read the latest document, reconsider the patch, and use a new operation ID. |
 | Ambiguous or mismatched patch target | Read the document and correct the range. Do not guess an offset. |

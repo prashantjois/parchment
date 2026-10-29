@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import ParchmentIntegration
 
 enum TabCloseScope { case before, after, all }
 enum TabDropEdge { case before, after }
@@ -55,6 +56,14 @@ struct DocumentTab: View {
     private var selected: Bool { workspace.activeID == document.id }
     private func comment() { workspace.beginFileComment(document) }
 
+    private func attachmentStatus(_ session: JSON, _ request: JSON?) -> String {
+        if let request {
+            if request["last_error"].string != nil { return " — delivery failed; retrying" }
+            return request["accepted_at"] == .null ? " — request pending" : " — queued; awaiting attachment"
+        }
+        return session["receiver_registered"].int == 1 ? "" : " — receiver unavailable"
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
@@ -84,6 +93,36 @@ struct DocumentTab: View {
                                                                        width: width, edge: $dropEdge))
             .contextMenu {
                 Button("Add File Comment", action: comment)
+                Menu("Attached Sessions") {
+                    if document.integrationAttachment["status"].string == "attached" {
+                        Text(document.integrationAttachment["display_name"].string ?? "Agent session")
+                        Text("Session ID: \(document.integrationAttachment["session_id"].string ?? "")")
+                    } else {
+                        Text("No attached sessions")
+                    }
+                }
+                Menu("Attach to Session") {
+                    let candidates = document.integrationSessions.filter { $0["session_id"] != document.integrationAttachment["session_id"] }
+                    if candidates.isEmpty { Text("No other registered sessions") }
+                    ForEach(candidates.indices, id: \.self) { index in
+                        let session = candidates[index]
+                        let request = document.integrationRequests.first { $0["session_id"] == session["session_id"] }
+                        if request != nil {
+                            Menu((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request)) {
+                                Button("Cancel Attachment Request") {
+                                    if let id = session["session_id"].string { document.cancelAgentAttachment?(id) }
+                                }
+                            }
+                        } else {
+                            Button {
+                                if let id = session["session_id"].string { document.requestAgentAttachment?(id) }
+                            } label: {
+                                Text((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request))
+                            }
+                            .disabled(session["receiver_registered"].int != 1)
+                        }
+                    }
+                }
                 Divider()
                 Button("Close Tab") { workspace.close(document) }
                 Button("Close Tabs Before") { workspace.closeTabs(.before, relativeTo: document.id) }

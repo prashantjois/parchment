@@ -21,6 +21,7 @@ extension IntegrationRegistry {
         return try transaction {
             let current = try rows("SELECT * FROM receivers WHERE session_id=?", [sessionID]).first
             if current?["agent_session_id"] != .string(agent) || current?["executable"] != .string(executable) || current?["arguments"] != .string(encoded) {
+                try execute("UPDATE attachment_requests SET accepted_at=NULL,lease_id=NULL,lease_until=0,next_attempt=0,last_error=NULL WHERE session_id=? AND state='pending'", [sessionID])
                 try execute("DELETE FROM receivers WHERE session_id=?", [sessionID])
                 try execute("INSERT INTO receivers(session_id,receiver_id,agent_session_id,executable,arguments) VALUES(?,?,?,?,?)", [sessionID, .string(UUID().uuidString), .string(agent), .string(executable), .string(encoded)])
             }
@@ -43,15 +44,19 @@ extension IntegrationRegistry {
         let outstanding = try rows("SELECT COUNT(*) AS count FROM feedback f JOIN bindings b ON b.document_id=f.document_id WHERE b.session_id=? AND f.sequence>b.acknowledged", [sessionID]).first?["count"] ?? .integer(0)
         let accepted = try rows("SELECT COUNT(*) AS count FROM notifications n JOIN bindings b ON b.document_id=n.document_id AND b.binding_id=n.binding_id WHERE n.receiver_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NOT NULL", [receiver["receiver_id"]!]).first?["count"] ?? .integer(0)
         let failed = try rows("SELECT n.attempts,n.last_error,n.next_attempt FROM notifications n JOIN bindings b ON b.binding_id=n.binding_id WHERE n.receiver_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NULL AND n.last_error IS NOT NULL ORDER BY n.sequence LIMIT 1", [receiver["receiver_id"]!]).first
+        let requestFailure = try rows("SELECT attempts,last_error,next_attempt FROM attachment_requests WHERE session_id=? AND state='pending' AND accepted_at IS NULL AND last_error IS NOT NULL ORDER BY created LIMIT 1", [sessionID]).first
+        let failure = failed ?? requestFailure
+        let requests = try rows("SELECT COUNT(*) AS count FROM attachment_requests WHERE session_id=? AND state='pending'", [sessionID]).first?["count"] ?? .integer(0)
         return .object(["registered": .bool(true), "mode": .string("automatic"), "protocol_version": .integer(1),
                         "receiver_id": receiver["receiver_id"]!, "agent_session_id": receiver["agent_session_id"]!,
-                        "pending_feedback": outstanding, "accepted_notifications": accepted,
-                        "last_error": failed?["last_error"] ?? .null, "attempts": failed?["attempts"] ?? .integer(0),
-                        "next_attempt": failed?["next_attempt"] ?? .null])
+                        "pending_attachment_requests": requests, "pending_feedback": outstanding, "accepted_notifications": accepted,
+                        "last_error": failure?["last_error"] ?? .null, "attempts": failure?["attempts"] ?? .integer(0),
+                        "next_attempt": failure?["next_attempt"] ?? .null])
     }
     /// Claim a lease so the app and an optional standalone worker cannot send concurrently.
     public func claimNotification() throws -> JSON? {
         try transaction {
+            if let request = try claimAttachmentRequest() { return request }
             try execute("""
                 INSERT OR IGNORE INTO notifications(delivery_id,receiver_id,document_id,binding_id,generation,sequence)
                 SELECT lower(hex(randomblob(16))),r.receiver_id,b.document_id,b.binding_id,b.generation,f.sequence
@@ -75,13 +80,15 @@ extension IntegrationRegistry {
         }
     }
     public func notificationIsCurrent(_ delivery: JSON) throws -> Bool {
-        !(try rows("""
+        if delivery["type"].string == "parchment.attachment_requested" { return try attachmentRequestIsCurrent(delivery) }
+        return !(try rows("""
             SELECT n.delivery_id FROM notifications n JOIN receivers r ON r.receiver_id=n.receiver_id
             JOIN bindings b ON b.binding_id=n.binding_id AND b.generation=n.generation AND b.session_id=r.session_id
             WHERE n.delivery_id=? AND n.lease_id=? AND n.sequence>b.acknowledged AND n.accepted_at IS NULL
             """, [delivery["delivery_id"], delivery["lease_id"]])).isEmpty
     }
     public func finishNotification(_ delivery: JSON, error: String?) throws {
+        if delivery["type"].string == "parchment.attachment_requested" { return try finishAttachmentRequest(delivery, error: error) }
         if let error {
             let delay = min(60.0, pow(2, Double(min(delivery["attempts"].int ?? 1, 6))))
             try execute("UPDATE notifications SET lease_id=NULL,lease_until=0,next_attempt=?,last_error=? WHERE delivery_id=? AND lease_id=?", [.number(Date().timeIntervalSince1970 + delay), .string(error), delivery["delivery_id"], delivery["lease_id"]])
@@ -111,9 +118,12 @@ public struct FeedbackDispatcher: Sendable {
         let process = Process()
         do {
             guard !Task.isCancelled, try registry.notificationIsCurrent(delivery) else { return }
-            let message = "🤖 Published Parchment feedback is available for document \(delivery["document_id"].string!). Resume your existing Parchment session, attach this document to validate ownership, and read get_feedback. Read the latest document before edits. Handle feedback within the user's task, then acknowledge only the handled cursors. Notification \(delivery["delivery_id"].string!) (event \(delivery["event_id"].string!), binding \(delivery["binding_id"].string!), generation \(delivery["generation"].int!))."
-            let payload: JSON = .object(["protocol_version": .integer(1), "type": .string("parchment.feedback_available"),
-                "delivery_id": delivery["delivery_id"], "event_id": delivery["event_id"], "cursor": delivery["sequence"],
+            let isAttachment = delivery["type"].string == "parchment.attachment_requested"
+            let message = isAttachment
+                ? "🤖 The user requested attaching Parchment document \(delivery["document_id"].string!) to this existing agent conversation. Resume your original Parchment session. Synchronize its session name and model. Call attach_document with your retained token and attachment_request_id \(delivery["delivery_id"].string!). Read the latest document and get_feedback before changes. Keep work within the user’s task. Attachment alone does not request edits. Stop on STALE_ATTACHMENT_REQUEST; do not retry without the request ID. Request \(delivery["delivery_id"].string!)."
+                : "🤖 Published Parchment feedback is available for document \(delivery["document_id"].string!). Resume your existing Parchment session and synchronize its name and model. Attach this document to validate ownership, and read get_feedback. Read the latest document before edits. Handle feedback within the user's task, then acknowledge only the handled cursors. Notification \(delivery["delivery_id"].string!) (event \(delivery["event_id"].string!), binding \(delivery["binding_id"].string!), generation \(delivery["generation"].int!))."
+            let payload: JSON = .object(["protocol_version": .integer(1), "type": .string(isAttachment ? "parchment.attachment_requested" : "parchment.feedback_available"),
+                "attachment_request_id": isAttachment ? delivery["delivery_id"] : .null, "delivery_id": delivery["delivery_id"], "event_id": delivery["event_id"], "cursor": delivery["sequence"],
                 "session_id": delivery["session_id"], "agent_session_id": delivery["agent_session_id"],
                 "document_id": delivery["document_id"], "binding_id": delivery["binding_id"], "generation": delivery["generation"], "message": .string(message)])
             let substitutions = ["{agent_session_id}": delivery["agent_session_id"].string!, "{message}": message,

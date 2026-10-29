@@ -128,7 +128,7 @@ struct CommentsSidebar: View {
             if document.integrationAttachment["status"].string == "attached" {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Agent attached", systemImage: "link").font(.caption.bold())
-                    Text(document.integrationAttachment["conversation_label"].string ?? "Agent conversation").font(.callout).lineLimit(2)
+                    Text(document.integrationAttachment["display_name"].string ?? "Agent conversation").font(.callout).lineLimit(2)
                     Text("\(document.integrationAttachment["client"].string ?? "Agent") · \(document.integrationAttachment["queued_feedback"].int ?? 0) feedback items awaiting acknowledgement")
                         .font(.caption).foregroundStyle(.secondary)
                     if document.integrationAttachment["delivery"]["last_error"].string != nil {

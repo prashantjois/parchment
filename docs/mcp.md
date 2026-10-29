@@ -48,7 +48,7 @@ An existing file uses the same workflow. `open_document` opens or activates its 
 Example calls:
 
 ```json
-{"name":"create_session","arguments":{"client":"My agent","conversation_label":"Design document review"}}
+{"name":"create_session","arguments":{"client":"My agent","conversation_label":"Design document review","model":"CURRENT-MODEL"}}
 {"name":"open_document","arguments":{"path":"/Users/me/design.md","attach":true,"session_token":"TOKEN"}}
 {"name":"wait_for_feedback","arguments":{"session_token":"TOKEN","binding_id":"BINDING","generation":1,"timeout_seconds":25}}
 {"name":"get_document","arguments":{"document_id":"DOCUMENT"}}
@@ -62,14 +62,20 @@ The wait tool returns within 25 seconds and supports cancellation. Empty respons
 
 The wait tool requires an active conversation. Automatic follow-up uses the generic agent delivery protocol described below.
 
-The conversation label identifies the owner in Parchment. An optional `conversation_id` records the client's conversation reference. Register a receiver to configure delivery to the runtime's agent session.
+The display name includes the session name, optional model, client, and a short stable session ID. Supply the runtime's current session name as `conversation_label` and its model as `model`. If the runtime does not expose a name, use a descriptive label. Omit an unknown model. An optional `conversation_id` records the client's conversation reference.
+
+At each new turn or reconnection, call `resume_session` and compare the name and model with the current runtime. Use `update_session` to synchronize changes in place. An empty `model` clears a stale model value. Metadata changes preserve the session ID, token, attachments, and receiver. Metadata does not select or change the model.
+
+`list_sessions` returns safe session metadata and attached document references. It includes receiver availability and last activity. Registration and last activity do not prove that a session is running.
 
 ## Tools
 
 | Tool | Behavior |
 | --- | --- |
 | `create_session` | Creates a conversation identity and returns its secret token once. |
-| `resume_session` | Validates a token after reconnection. |
+| `resume_session` | Validates a token and returns current session metadata. |
+| `update_session` | Synchronizes the session name and model without replacing its identity. |
+| `list_sessions` | Lists registered sessions, receiver availability, and attached documents without tokens. |
 | `register_receiver` | Registers the owning agent session's runtime queue command. |
 | `get_receiver_status` | Reports configuration, accepted notifications, and retry errors. |
 | `unregister_receiver` | Stops automatic delivery without releasing document ownership. |
@@ -94,6 +100,22 @@ Saved document metadata includes `open_url`, a link such as `parchment://Users/m
 Read tools can inspect published documents without ownership. Feedback delivery and mutation tools require the owning session, binding, and generation.
 
 Document lookup can reopen a closed saved file. Unsaved documents use IDs and must remain open or available in session recovery.
+
+## Attach from a tab
+
+Right-click a tab and open **Attached Sessions** to see its owner, name, model, and session ID. Open **Attach to Session** to choose another registered session. Sessions without a receiver appear unavailable.
+
+Parchment queues an attachment request through the selected session's existing receiver. The menu shows pending, queued, and failed delivery states. Failed deliveries retry. Use **Cancel Attachment Request** to withdraw a pending request.
+
+A document keeps one owner. If it already has an owner, Parchment asks for an explicit transfer confirmation. The current owner remains attached until the receiving agent accepts. Unhandled feedback carries over after transfer.
+
+The receiver gets `parchment.attachment_requested`, with an `attachment_request_id`, document ID, and session IDs. Feedback fields such as `cursor` and `binding_id` are null. The request contains no token or document text.
+
+The agent resumes its original session and synchronizes its name and model. It calls `attach_document` with its own token, the document ID, and `attachment_request_id`. It then reads the latest document and `get_feedback`. Attachment alone does not request edits or acknowledge feedback.
+
+The request ID validates the user's choice against the current ownership. Cancellation or an intervening ownership change causes `STALE_ATTACHMENT_REQUEST`. Do not retry without the request ID. Ask the user to choose the session again if needed.
+
+Repeated pending requests use one stable delivery ID. Acceptance by the runtime means queued input; the menu reports attachment only after the agent attaches. A confirmed transfer invalidates the old binding.
 
 ## Automatic agent delivery
 
@@ -157,7 +179,7 @@ The app runs a dispatcher independently of MCP connections and agent turns. For 
 
 The app and standalone workers can run together against the same registry. Use the same `PARCHMENT_DATA_DIR` when testing with isolated storage. Delivery from an accepted notification can remain queued in the agent runtime after Parchment closes.
 
-Call `get_receiver_status` with the session token to inspect `registered`, `pending_feedback`, `accepted_notifications`, `last_error`, and `next_attempt`. Registration proves configuration; acceptance proves runtime enqueue. Neither proves that an agent completed the review. The Comments sidebar shows configuration and retry failures.
+Call `get_receiver_status` with the session token to inspect `registered`, `pending_feedback`, `pending_attachment_requests`, `accepted_notifications`, `last_error`, and `next_attempt`. Registration proves configuration; acceptance proves runtime enqueue. Neither proves that an agent completed the review. The Comments sidebar shows configuration and retry failures.
 
 Detachment prevents further delivery for that document. Handoffs invalidate the old binding and route unhandled feedback to the receiving session's receiver. A notification already accepted by the old runtime cannot be recalled. Its old binding cannot read feedback or change the document. Unregistering a receiver cancels its pending delivery without removing ownership or feedback.
 
@@ -179,7 +201,7 @@ The local registry lives at:
 ~/Library/Application Support/Parchment/integration.sqlite
 ```
 
-SQLite stores document IDs, canonical paths, hashed session tokens, ownership generations, feedback cursors, operation receipts, receiver registrations, and notification delivery state. It uses WAL transactions and full synchronization.
+SQLite stores document IDs, session names and models, hashed tokens, ownership generations, feedback cursors, operation receipts, receivers, and attachment requests. It also stores canonical paths and notification delivery state. It uses WAL transactions and full synchronization.
 
 The companion file stores the stable `documentID`. Opening a copied sidecar assigns a new ID when the original still exists. File moves preserve identity through the registry and companion. Save As creates a separate identity for a previously saved document.
 

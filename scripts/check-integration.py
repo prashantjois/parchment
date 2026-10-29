@@ -138,9 +138,17 @@ def main():
             return client
 
         try:
+            state.mkdir()
+            with sqlite3.connect(state / "integration.sqlite") as database:
+                database.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, client TEXT NOT NULL, label TEXT NOT NULL, conversation_id TEXT, last_seen REAL NOT NULL)")
+                database.execute("INSERT INTO sessions VALUES(?,?,?,?,?,?)", ("legacy-session", hashlib.sha256(b"legacy-token").hexdigest(), "Old client", "Legacy conversation", "old-runtime", 0))
+                database.execute("PRAGMA user_version=1")
             a, b = new_client(), new_client()
+            legacy = a.tool("resume_session", {"session_token": "legacy-token"})
+            assert legacy["session_id"] == "legacy-session" and legacy["model"] is None
+            passed("version-one registry migrates without losing session identity")
             tools = a.request("tools/list")["tools"]
-            assert len(tools) == 18 and len({tool["name"] for tool in tools}) == 18
+            assert len(tools) == 20 and len({tool["name"] for tool in tools}) == 20
             a.tool("list_documents", error="APP_UNAVAILABLE")
             a.tool("create_session", {"client": 42, "conversation_label": "bad"}, error="INVALID_ARGUMENT")
             passed("MCP initialization, schemas, and unavailable-app error")
@@ -174,6 +182,22 @@ def main():
             conflict = b.tool("attach_document", {"path": str(document_path), "session_token": second["session_token"]}, error="DOCUMENT_ALREADY_ATTACHED")
             assert first["session_token"] not in json.dumps(conflict)
             passed("open existing file, reuse tab, persist ID, and enforce one owner")
+            updated = a.tool("update_session", {"session_token": first["session_token"], "conversation_label": "Renamed session", "model": "A different model"})
+            assert updated["session_id"] == first["session_id"] and updated["model"] == "A different model"
+            assert "Renamed session" in updated["display_name"] and "A different model" in updated["display_name"]
+            assert a.tool("resume_session", {"session_token": first["session_token"]})["conversation_label"] == "Renamed session"
+            assert a.tool("attach_document", {"document_id": doc_id, "session_token": first["session_token"]})["binding_id"] == auth["binding_id"]
+            owners = a.tool("list_documents")["documents"]
+            assert next(item for item in owners if item["document_id"] == doc_id)["attachment"]["model"] == "A different model"
+            sessions = a.tool("list_sessions")
+            listed = next(item for item in sessions["sessions"] if item["session_id"] == first["session_id"])
+            assert len(listed["documents"]) == 2 and listed["conversation_label"] == "Renamed session"
+            assert first["session_token"] not in json.dumps(sessions) and "token_hash" not in json.dumps(sessions)
+            a.tool("update_session", {"session_token": "wrong", "model": "bad"}, error="INVALID_SESSION")
+            a.tool("update_session", {"session_token": first["session_token"], "conversation_label": " "}, error="INVALID_ARGUMENT")
+            assert a.tool("update_session", {"session_token": first["session_token"], "model": ""})["model"] is None
+            assert a.tool("update_session", {"session_token": first["session_token"]})["conversation_label"] == "Renamed session"
+            passed("session names and models synchronize in place and listing never exposes credentials")
             ref = {"document_id": doc_id}
             assert a.tool("get_document", ref)["text"] == original
             local("test_comment", **ref, quote="paragraph", body="Private draft", pending=True)

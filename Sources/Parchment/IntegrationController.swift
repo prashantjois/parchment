@@ -59,6 +59,30 @@ import ParchmentIntegration
             do { try self.registry.releaseDocument(document.id.uuidString); self.refreshAttachments() }
             catch { self.workspace?.error = error.localizedDescription }
         }
+        document.requestAgentAttachment = { [weak self, weak document] sessionID in
+            guard let self, let document else { return }
+            do {
+                let owner = try self.registry.attachment(document.id.uuidString)
+                let transfer = owner["status"].string == "attached" && owner["session_id"].string != sessionID
+                if transfer {
+                    let target = document.integrationSessions.first { $0["session_id"].string == sessionID }
+                    let alert = NSAlert()
+                    alert.messageText = "Transfer this document to another session?"
+                    alert.informativeText = "Transfer from \(owner["display_name"].string ?? "the current session") to \(target?["display_name"].string ?? sessionID)? The current session stays attached until the receiving agent accepts. Unhandled feedback carries over."
+                    alert.addButton(withTitle: "Request Transfer"); alert.addButton(withTitle: "Cancel")
+                    guard alert.runModal() == .alertFirstButtonReturn else { return }
+                }
+                _ = try self.registry.requestAttachment(documentID: document.id.uuidString, sessionID: sessionID, transfer: transfer, expectedOwner: owner)
+                self.refreshAttachments()
+            } catch { self.workspace?.error = error.localizedDescription }
+        }
+        document.cancelAgentAttachment = { [weak self, weak document] sessionID in
+            guard let self, let document else { return }
+            do {
+                try self.registry.cancelAttachmentRequest(documentID: document.id.uuidString, sessionID: sessionID)
+                self.refreshAttachments()
+            } catch { self.workspace?.error = error.localizedDescription }
+        }
         document.integrationAttachment = try registry.attachment(document.id.uuidString)
     }
     func syncFeedback() {
@@ -77,7 +101,10 @@ import ParchmentIntegration
         refreshAttachments()
     }
     func refreshAttachments() {
+        let sessions = (try? registry.registeredSessions()["sessions"].array) ?? []
         for document in workspace?.documents ?? [] {
+            if let requests = try? registry.attachmentRequests(documentID: document.id.uuidString).array, requests != document.integrationRequests { document.integrationRequests = requests }
+            if document.integrationSessions != sessions { document.integrationSessions = sessions }
             if let attachment = try? registry.attachment(document.id.uuidString), attachment != document.integrationAttachment { document.integrationAttachment = attachment }
         }
     }
@@ -200,7 +227,7 @@ import ParchmentIntegration
         guard let workspace else { throw BridgeError("APP_UNAVAILABLE", "The editor is closing.") }
         defer { refreshAttachments() }
         switch method {
-        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "agent_delivery_version": .integer(1), "pid": .integer(Int(getpid()))])
+        case "ping": return .object(["app": .string("Parchment"), "api_version": .integer(1), "agent_delivery_version": .integer(1), "attachment_requests_version": .integer(1), "pid": .integer(Int(getpid()))])
         case "activate":
             if !headless { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first(where: { $0.title == "Parchment" })?.makeKeyAndOrderFront(nil) }
             return .object(["running": .bool(true)])
@@ -230,7 +257,7 @@ import ParchmentIntegration
             let document = try self.document(args)
             try register(document)
             if let url = document.url { try document.comments.write(for: url) }
-            let binding = try registry.attach(documentID: document.id.uuidString, sessionToken: args.require("session_token"))
+            let binding = try registry.attach(documentID: document.id.uuidString, sessionToken: args.require("session_token"), requestID: args["attachment_request_id"].string)
             syncFeedback(); return binding
         case "get_document":
             let document = try self.document(args)
@@ -254,6 +281,8 @@ import ParchmentIntegration
         if method == "test_shutdown" { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { exit(0) }; return .bool(true) }
         let document = try self.document(args)
         switch method {
+        case "test_cancel_attachment": try registry.cancelAttachmentRequest(documentID: document.id.uuidString, sessionID: args.require("session_id")); return .bool(true)
+        case "test_request_attachment": return try registry.requestAttachment(documentID: document.id.uuidString, sessionID: args.require("session_id"), transfer: args["transfer"].bool ?? false)
         case "test_file_comment": document.addComment(body: try args.require("body"), pending: args["pending"].bool ?? false, fileLevel: true)
         case "test_comment":
             let quote = try args.require("quote"), range = (document.text as NSString).range(of: quote)
