@@ -41,6 +41,8 @@ Parchment opens documents, receives tool calls, and can notify the owning agent 
 
 ## Register wake-up delivery and read the event bus
 
+Always prefer automatic notifications for document changes, comments, reviews, and attachment requests. Use `wake_up.mode: "command"` whenever the current host supports queuing input in the existing conversation.
+
 Supply `wake_up` in the same `create_session` call that registers the conversation. Registration validates and saves identity and delivery together. Do not create the session first and leave delivery for a later optional call.
 
 For a runtime with a documented queue command, supply command mode, the actual runtime conversation ID, executable, and arguments:
@@ -53,9 +55,11 @@ The path and flags are illustrative. Use the runtime's documented queue interfac
 
 Arguments support `{agent_session_id}`, `{message}`, `{delivery_id}`, and `{document_id}`. Parchment invokes the executable directly and supplies one JSON notification through stdin. Exit 0 means the host queued input durably. It does not acknowledge work.
 
-If the runtime has no supported wake-up interface or its conversation ID is unavailable, explicitly register `"wake_up":{"mode":"manual"}`. Explain that events remain queued until the agent next runs or waits for them. Do not claim automatic responses are enabled.
+Before choosing manual mode, inspect the runtime's documented queue interface, available conversation metadata, and installed queue executable. Try to obtain missing wake-up details from those sources. Do not choose manual mode merely because those details are absent from the current context.
 
-For an existing session, preserve its token. Inspect `wake_up_mode` and `get_receiver_status` after reconnecting. A legacy `unspecified` mode needs an explicit configuration. Use `update_session` with `wake_up` to add or repair delivery using known runtime details. Do not replace an existing command configuration with manual mode unless the user asks to stop automatic delivery. `register_receiver` remains a compatibility tool; new setup uses session registration or update.
+Use `"wake_up":{"mode":"manual"}` only if the user requests it or automatic delivery remains unavailable after these checks. State the specific blocker, such as an unsupported queue interface or an undiscoverable conversation ID. Explain that events wait until the agent next runs or waits for them. Never invent a command or ID to enable automatic mode.
+
+For an existing session, preserve its token. Inspect `wake_up_mode` and `get_receiver_status` after reconnecting. Upgrade `manual` or legacy `unspecified` delivery through `update_session` when automatic delivery is supported. Honor an explicit user request to keep manual delivery. Use known runtime details to repair missing or failed automatic delivery. Keep an existing command configuration during transient delivery failures; do not silently downgrade it to manual. `register_receiver` remains a compatibility tool; new setup uses session registration or update.
 
 At each new turn, and on every Parchment notification, call `get_events` with the retained `session_token`. This reads only that session's common inbox. It includes attachment requests for files that are not yet owned by the session. Names and models are display metadata; the stable session ID determines routing.
 
@@ -72,7 +76,7 @@ Successful attachment acceptance or cancellation completes its bus event. Docume
 
 For an ongoing review, use `wait_for_events` with the session token and `timeout_seconds: 25`. It covers all session documents and new attachment requests. After an empty result, wait again while the review remains active. Leave blocked or out-of-scope work queued and explain the blocker.
 
-Call `get_receiver_status` to inspect pending events, accepted wake-ups, and retry errors. Configuration does not prove that the runtime received a message. A successful wake-up does not prove that the agent handled it. Do not clear failures by acknowledging unfinished work.
+After configuring automatic delivery, call `get_receiver_status` and verify `registered: true` and `mode: "automatic"`. Inspect `last_error` and repair reported failures. Report any unresolved delivery blocker instead of claiming automatic notifications work. Configuration does not prove receipt, and a successful wake-up does not prove completion. Do not clear failures by acknowledging unfinished work.
 
 The app dispatches wake-ups independently of agent turns. A supervised `ParchmentMCP --dispatch-events` worker uses the same common bus while the app is closed. It does not select a model or create another agent conversation. Automatic wake-up still requires a supported host command.
 
