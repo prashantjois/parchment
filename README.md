@@ -4,6 +4,36 @@ Parchment is an AI-native Markdown editor for macOS 14 or later. Write, review, 
 
 See [Version history](docs/versions.md) for release dates, build numbers, and changes.
 
+## Quick start
+
+1. From this checkout, build and install Parchment:
+
+   ```sh
+   ./scripts/build-and-install.sh
+   ```
+
+   Accept the prompts to install the skill and register Parchment links. See [Build from source](#build-from-source) for requirements.
+
+2. Open your favorite AI agent with your preferred model. Ask it:
+
+   > Install the Parchment skill from `skills/parchment` in this checkout if it is not already installed. Connect it to Parchment and enable automatic notifications for this session.
+
+   The installer includes the skill by default. The agent can use the [Parchment skill](skills/parchment/SKILL.md) and [MCP setup guide](docs/mcp.md) for setup.
+
+3. Ask the agent to collaborate on an existing Markdown document:
+
+   > Let's collaborate on this doc: `/absolute/path/to/notes.md`.
+
+   Or ask it to create a document:
+
+   > Generate a Markdown project plan in `docs/plan.md`. Let's collaborate on it in Parchment.
+
+   The agent opens the document in Parchment and attaches it to your conversation.
+
+4. In Parchment, select some text and click **Comment**. Enter a request, such as “Make this paragraph shorter.” Click **Comment Now**.
+
+   With automatic notifications active, the agent receives your comment immediately and responds in the same conversation. Watch its changes appear in Parchment.
+
 ## Install and open
 
 Use the macOS installer (`.pkg`) to install or upgrade Parchment. Download it from [the latest GitHub Release](https://github.com/prashantjois/parchment/releases/latest). Each release includes the installer and its SHA-256 checksum. Installer names include the version and architecture.
