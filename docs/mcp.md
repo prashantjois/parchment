@@ -63,7 +63,7 @@ The wait tool returns within 25 seconds and supports cancellation. Empty respons
 
 The wait tool requires an active conversation. Automatic follow-up uses the generic agent delivery protocol described below.
 
-The display name includes the session name, optional model, client, and a short stable session ID. Supply the runtime's current session name as `conversation_label` and its model as `model`. If the runtime does not expose a name, use a descriptive label. Omit an unknown model. An optional `conversation_id` records the client's conversation reference.
+The API display name includes the session name, optional model, client, and a short stable session ID. The tab's Sessions menu omits the identifier. Supply the runtime's current session name as `conversation_label` and its model as `model`. If the runtime does not expose a name, use a descriptive label. Omit an unknown model. An optional `conversation_id` records the client's conversation reference.
 
 At each new turn or reconnection, call `resume_session` and compare the name and model with the current runtime. Use `update_session` to synchronize changes in place. An empty `model` clears a stale model value. Metadata changes preserve the session ID, token, attachments, and receiver. Metadata does not select or change the model.
 

@@ -129,9 +129,9 @@ public final class IntegrationRegistry: @unchecked Sendable {
             throw BridgeError("INVALID_ARGUMENT", "Use a nonempty session name and optional model, each at most 1 KB.")
         }
     }
-    public static func sessionDisplayName(_ session: JSON) -> String {
+    public static func sessionDisplayName(_ session: JSON, includeIdentifier: Bool = true) -> String {
         [session["conversation_label"].string ?? "Agent session", session["model"].string,
-         session["client"].string, session["session_id"].string.map { String($0.prefix(8)) }]
+         session["client"].string, includeIdentifier ? session["session_id"].string.map { String($0.prefix(8)) } : nil]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
     private func sessionMetadata(_ row: [String: JSON]) -> JSON {

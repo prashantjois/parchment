@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.33 | 34 | 2026-10-29 | Current release | Combined session registration and wake-up configuration; added one durable event bus for attachment requests, comments, and reviews. |
+| 0.1.34 | 35 | 2026-10-29 | Current release | Removed session identifiers from the tab's Sessions menu. |
+| 0.1.33 | 34 | 2026-10-29 | `b62cbed` | Combined session registration and wake-up configuration; added one durable event bus for attachment requests, comments, and reviews. |
 | 0.1.32 | 33 | 2026-10-29 | `28b72e5` | Combined tab attachment menus into Sessions, with check marks and click actions to attach, detach, or cancel a request. |
 | 0.1.31 | 32 | 2026-10-29 | `dafb15f` | Replaced the theme collection with twenty original styles, category browsing, descriptions, and automatic selection migration. |
 | 0.1.30 | 31 | 2026-10-29 | `a25ce7f` | Newly opened files always start in Rendered mode, including files previously closed in Raw or Split mode. |
@@ -38,6 +39,10 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.34
+
+- The tab's Sessions menu shows the session name, model, client, and attachment status without a technical identifier.
 
 ## 0.1.33
 

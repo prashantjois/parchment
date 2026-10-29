@@ -105,7 +105,7 @@ struct DocumentTab: View {
                         }, set: { enabled in
                             if let id = session["session_id"].string { document.setAgentSessionAttached?(id, enabled) }
                         })) {
-                            Text((session["display_name"].string ?? "Agent session") + attachmentStatus(session, request))
+                            Text(IntegrationRegistry.sessionDisplayName(session, includeIdentifier: false) + attachmentStatus(session, request))
                         }
                         .help(request != nil ? "Cancel this attachment request" : attached ? "Detach this session from the file" : "Attach the file to this session")
                     }
