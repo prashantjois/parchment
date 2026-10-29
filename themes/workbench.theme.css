@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Workbench */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Workbench";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reference";
+    --pt-theme-description: "Familiar system type and practical README styling.";
+    --pt-font-body: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 16px;
+    --pt-line-height: 1.65;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.15em;
+    --pt-heading-weight: 650;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #ffffff;
+    --pt-surface: #f5f6f8;
+    --pt-text: #2e3339;
+    --pt-muted: #636c78;
+    --pt-heading: #1f252c;
+    --pt-link: #1b61ae;
+    --pt-border: #d6dce3;
+    --pt-code: #9a3658;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #1b61ae;
+    --pt-selection-text: #ffffff;
+    --pt-syntax-comment: #636c78;
+    --pt-syntax-keyword: #9a3658;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #1b61ae;
+    --pt-syntax-type: #9a3658;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #1b1e24;
+    --pt-surface: #282d35;
+    --pt-text: #e1e6ec;
+    --pt-muted: #aab4c1;
+    --pt-heading: #f0f4f9;
+    --pt-link: #8dbbfa;
+    --pt-border: #444d5a;
+    --pt-code: #f0a4bf;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #8dbbfa;
+    --pt-selection-text: #1b1e24;
+    --pt-syntax-comment: #aab4c1;
+    --pt-syntax-keyword: #f0a4bf;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #8dbbfa;
+    --pt-syntax-type: #f0a4bf;
+  }
+  .markdown-doc :is(h1, h2) { border-bottom: 1px solid var(--pt-border); padding-bottom: 0.3em; }
+  .markdown-doc h1 { letter-spacing: -0.025em; }
+  .markdown-doc pre { border: 0; border-radius: 6px; }
+  .markdown-doc blockquote { border-color: var(--pt-border); }
+}

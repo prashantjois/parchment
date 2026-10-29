@@ -4,6 +4,35 @@ Parchment themes are UTF-8 files with the `.theme.css` extension. They use stand
 
 The app implements this rendering contract with a native interface and a local WebKit preview.
 
+## Bundled themes
+
+The collection takes inspiration from [markdown.style](https://markdown.style/themes), with original CSS, new names, and local font stacks. Each theme supports System, Light, and Dark appearance. The Evening category also includes a light palette.
+
+| Theme | Category | Style |
+| --- | --- | --- |
+| Harbor | Reports | Navy headings, teal links, and ruled tables |
+| Canopy | Reports | Deep green headings on warm paper |
+| Flare | Reports | Bold type with an orange title bar |
+| Waypoint | Reference | Violet accents and clear documentation hierarchy |
+| Keystroke | Reference | Monospace text and restrained blue details |
+| Workbench | Reference | System fonts and familiar README styling |
+| Storybook | Reading | Expressive serif titles and relaxed spacing |
+| Periodical | Reading | Centered titles and small-cap subheadings |
+| Vellum | Reading | Warm paper and soft brown serif text |
+| Academy | Reading | Formal serif text, justified paragraphs, and blue accents |
+| Cotton | Quiet | Soft neutral colors and rounded details |
+| Breeze | Quiet | Airy spacing and lightweight system type |
+| Pebble | Quiet | Cool gray surfaces and compact typography |
+| Gazette | Expressive | Tall serif headlines and red accents |
+| Jubilee | Expressive | Large geometric headings and vivid purple |
+| Blueprint | Expressive | Uppercase headings, firm rules, and blue accents |
+| Cinder | Evening | Charcoal surfaces and soft blue links |
+| Fireside | Evening | Warm amber accents and humanist type |
+| Starlight | Evening | Navy and gold with serif typography |
+| Phosphor | Evening | Green terminal ink and prompt headings |
+
+Vellum is the default for new installations. Previous built-in selections move to a similar new theme during upgrade. Custom CSS, appearance, and font overrides remain available.
+
 ## Scope and loading
 
 The renderer exposes one document root: `<article class="markdown-doc" data-appearance="light">`. Dark appearance uses `data-appearance="dark"`.
@@ -31,7 +60,8 @@ The filename without `.theme.css` is the stable theme ID. The root declaration s
 ```css
 @layer parchment-theme {
   .markdown-doc {
-    --pt-theme-name: "Parchment";
+    --pt-theme-name: "My Theme";
+    --pt-theme-description: "Warm serif text for long documents.";
     --pt-theme-version: 1;
     --pt-font-body: Georgia, "Times New Roman", serif;
     --pt-font-heading: var(--pt-font-body);
@@ -60,7 +90,9 @@ The filename without `.theme.css` is the stable theme ID. The root declaration s
 }
 ```
 
-The base stylesheet supplies omitted values in both appearances. The ten sample themes supply complete palettes.
+The base stylesheet supplies omitted values in both appearances. The twenty bundled themes supply complete palettes.
+
+Built-in themes use optional `--pt-theme-category` and `--pt-theme-description` metadata for the theme picker. Imported and duplicated themes appear under Custom.
 
 ## Style variables
 

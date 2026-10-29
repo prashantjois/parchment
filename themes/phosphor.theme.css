@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Phosphor */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Phosphor";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Evening";
+    --pt-theme-description: "Green terminal ink, monospace text, and prompt headings.";
+    --pt-font-body: "SF Mono", Menlo, monospace;
+    --pt-font-heading: "SF Mono", Menlo, monospace;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 15px;
+    --pt-line-height: 1.8;
+    --pt-content-width: 100%;
+    --pt-heading-weight: 650;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #f1faf0;
+    --pt-surface: #e1eddf;
+    --pt-text: #253f2c;
+    --pt-muted: #527058;
+    --pt-heading: #153d23;
+    --pt-link: #28683a;
+    --pt-border: #bad2ba;
+    --pt-code: #725776;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #28683a;
+    --pt-selection-text: #f1faf0;
+    --pt-syntax-comment: #527058;
+    --pt-syntax-keyword: #725776;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #28683a;
+    --pt-syntax-type: #725776;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #111c16;
+    --pt-surface: #1d2d22;
+    --pt-text: #cbe7cf;
+    --pt-muted: #93b39a;
+    --pt-heading: #e3f8e4;
+    --pt-link: #a1dfa5;
+    --pt-border: #37543e;
+    --pt-code: #d2b5d9;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #a1dfa5;
+    --pt-selection-text: #111c16;
+    --pt-syntax-comment: #93b39a;
+    --pt-syntax-keyword: #d2b5d9;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #a1dfa5;
+    --pt-syntax-type: #d2b5d9;
+  }
+  .markdown-doc h1 { font-size: 2em; letter-spacing: -0.04em; }
+  .markdown-doc h1::before { content: "> "; color: var(--pt-link); }
+  .markdown-doc h2::before { content: "# "; color: var(--pt-link); }
+  .markdown-doc :is(pre, details, :not(pre) > code) { border-radius: 0; }
+  .markdown-doc pre { border-inline-start: 3px solid var(--pt-link); }
+  .markdown-doc th { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85em; }
+}

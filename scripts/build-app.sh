@@ -19,8 +19,7 @@ for architecture in $(/usr/bin/lipo -archs "$binary_directory/Parchment"); do
 done
 /usr/bin/lipo -create "${setup_binaries[@]}" -output "$app_directory/Contents/MacOS/ParchmentSetup"
 cp scripts/Info.plist "$app_directory/Contents/Info.plist"
-ditto themes "$app_directory/Contents/Resources/themes"
-for resource in skills docs; do
+for resource in themes skills docs; do
     mkdir -p "$app_directory/Contents/Resources/$resource"
     /usr/bin/rsync -a --delete --delete-excluded --exclude='*.comments.json' --exclude='*.review.json' \
         "$resource/" "$app_directory/Contents/Resources/$resource/"

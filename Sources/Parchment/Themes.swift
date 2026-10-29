@@ -8,6 +8,8 @@ struct EditorTheme: Identifiable {
     var css: String
     var url: URL
     var custom: Bool
+    var category: String
+    var summary: String
 }
 
 @MainActor final class ThemeLibrary: ObservableObject {
@@ -23,14 +25,19 @@ struct EditorTheme: Identifiable {
     private let defaults: UserDefaults
     let baseCSS: String
     let customDirectory: URL
-    var selected: EditorTheme? { items.first { $0.id == selectedID } ?? items.first }
+    static let categories = ["Reports", "Reference", "Reading", "Quiet", "Expressive", "Evening", "Custom"]
+    static let legacyIDs = ["native": "workbench", "parchment": "vellum", "editorial": "gazette", "terminal": "phosphor",
+                            "nordic": "pebble", "ocean": "harbor", "forest": "canopy", "rose": "jubilee",
+                            "graphite": "cinder", "bookish": "storybook"]
+    var selected: EditorTheme? { items.first { $0.id == selectedID } ?? items.first { $0.id == "vellum" } ?? items.first }
     static var bundledDirectory: URL {
         if let root = Bundle.main.resourceURL?.appendingPathComponent("themes"), FileManager.default.fileExists(atPath: root.path) { return root }
         return Bundle.module.resourceURL!.appendingPathComponent("themes")
     }
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        selectedID = defaults.string(forKey: "theme") ?? "parchment"
+        let savedTheme = defaults.string(forKey: "theme") ?? "vellum"
+        selectedID = Self.legacyIDs[savedTheme] ?? savedTheme
         appearance = defaults.string(forKey: "appearance") ?? "system"
         fontSize = defaults.double(forKey: "fontSize")
         customFont = defaults.string(forKey: "customFont") ?? ""
@@ -40,6 +47,7 @@ struct EditorTheme: Identifiable {
         customDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Parchment/Themes", isDirectory: true)
         try? FileManager.default.createDirectory(at: customDirectory, withIntermediateDirectories: true)
         reload()
+        defaults.set(selectedID, forKey: "theme")
         applyAppearance()
     }
     private func applyAppearance() {
@@ -55,10 +63,15 @@ struct EditorTheme: Identifiable {
             ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []).compactMap { url -> EditorTheme? in
                 guard url.lastPathComponent.hasSuffix(".theme.css"), let css = try? String(contentsOf: url, encoding: .utf8) else { return nil }
                 let id = url.lastPathComponent.replacingOccurrences(of: ".theme.css", with: "")
-                let regex = try! NSRegularExpression(pattern: #"--pt-theme-name:\s*"([^"]+)""#)
-                let match = regex.firstMatch(in: css, range: NSRange(css.startIndex..., in: css))
-                let name = match.map { (css as NSString).substring(with: $0.range(at: 1)) } ?? id.capitalized
-                return EditorTheme(id: custom ? "custom-" + id : id, name: name, css: css, url: url, custom: custom)
+                func metadata(_ key: String) -> String? {
+                    let regex = try! NSRegularExpression(pattern: "--pt-" + key + #":\s*"([^\"]+)""#)
+                    guard let match = regex.firstMatch(in: css, range: NSRange(css.startIndex..., in: css)) else { return nil }
+                    return (css as NSString).substring(with: match.range(at: 1))
+                }
+                let name = metadata("theme-name") ?? id.capitalized
+                return EditorTheme(id: custom ? "custom-" + id : id, name: name, css: css, url: url, custom: custom,
+                                   category: custom ? "Custom" : metadata("theme-category") ?? "Quiet",
+                                   summary: metadata("theme-description") ?? "Custom document styles.")
             }
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
@@ -101,7 +114,19 @@ struct ThemeSettings: View {
             HStack { Text("Themes").font(.title2.bold()); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonFeedback("Close theme settings (Return)") }
             HStack(alignment: .top, spacing: 20) {
                 Form {
-                    Picker("Theme", selection: $library.selectedID) { ForEach(library.items) { Text($0.name).tag($0.id) } }.buttonFeedback("Choose the document theme")
+                    Picker("Theme", selection: $library.selectedID) {
+                        ForEach(ThemeLibrary.categories, id: \.self) { category in
+                            let themes = library.items.filter { $0.category == category }
+                            if !themes.isEmpty {
+                                Section(category) {
+                                    ForEach(themes) { Text($0.name).tag($0.id) }
+                                }
+                            }
+                        }
+                    }.buttonFeedback("Choose a document theme by category")
+                    if let selected = library.selected {
+                        Text(selected.summary).font(.caption).foregroundStyle(.secondary)
+                    }
                     AppearancePicker(library: library)
                     HStack {
                         Text("Font size")

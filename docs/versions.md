@@ -4,7 +4,8 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 
 | Version | Build | Date | Source | Changes |
 | --- | --- | --- | --- | --- |
-| 0.1.30 | 31 | 2026-10-29 | Current release | Newly opened files always start in Rendered mode, including files previously closed in Raw or Split mode. |
+| 0.1.31 | 32 | 2026-10-29 | Current release | Replaced the theme collection with twenty original styles, category browsing, descriptions, and automatic selection migration. |
+| 0.1.30 | 31 | 2026-10-29 | `a25ce7f` | Newly opened files always start in Rendered mode, including files previously closed in Raw or Split mode. |
 | 0.1.29 | 30 | 2026-10-29 | `68c16ec` | Added session names and models, metadata synchronization, and tab menus for session inspection, attachment requests, and confirmed transfers. |
 | 0.1.28 | 29 | 2026-10-28 | `fb61e02` | Fixed editing crashes during composed input and stabilized native editor and preview refresh layout. |
 | 0.1.27 | 28 | 2026-10-28 | `24db304` | Changed installer version selection to local releases with numeric ordering and architecture filtering. |
@@ -35,6 +36,15 @@ Dates use America/Chicago time. These are local Apple Silicon installer builds. 
 | 0.1.2 | 3 | 2026-10-27 | Archived installer | Added separate installer options for the agent skill and immediate registration of parchmentr:// links. |
 | 0.1.1 | 2 | 2026-10-26 | `c007139` | First recorded source baseline: Markdown editing, ten themes, comments and reviews, MCP tools, agent skill, URL links, recovery, checks, and a macOS installer. |
 | 0.1.0 | 1 | 2026-10-26 | Archived installer | Initial packaged app with URL-scheme registration. Detailed changes before the first source commit were not recorded. |
+
+## 0.1.31
+
+- Replaced the ten bundled themes with twenty new designs inspired by markdown.style, using original names and CSS.
+- Themes vary typography, spacing, headings, quotes, code blocks, and tables. All include light and dark palettes and local font stacks.
+- The theme picker groups styles by category and shows a short description with the live preview.
+- Existing built-in selections move to similar new themes. Custom CSS and user overrides remain available.
+- Packaging removes retired theme files so upgrades show the current collection.
+- WebKit checks cover every theme in both appearances, text contrast, source selections, comments, and preference migration.
 
 ## 0.1.30
 

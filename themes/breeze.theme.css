@@ -1,0 +1,63 @@
+/* Parchment Theme CSS v1: Breeze */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Breeze";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Quiet";
+    --pt-theme-description: "Airy spacing and simple, lightweight system type.";
+    --pt-font-body: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.9;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.45em;
+    --pt-block-gap: 1.4em;
+    --pt-heading-weight: 550;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #ffffff;
+    --pt-surface: #f5f6f7;
+    --pt-text: #383d43;
+    --pt-muted: #6a727c;
+    --pt-heading: #222831;
+    --pt-link: #486783;
+    --pt-border: #dce1e6;
+    --pt-code: #775a75;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #486783;
+    --pt-selection-text: #ffffff;
+    --pt-syntax-comment: #6a727c;
+    --pt-syntax-keyword: #775a75;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #486783;
+    --pt-syntax-type: #775a75;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #1f242a;
+    --pt-surface: #2b323a;
+    --pt-text: #dfe6ed;
+    --pt-muted: #b0bdca;
+    --pt-heading: #f0f5fa;
+    --pt-link: #b4cde6;
+    --pt-border: #455360;
+    --pt-code: #d5b9d3;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #b4cde6;
+    --pt-selection-text: #1f242a;
+    --pt-syntax-comment: #b0bdca;
+    --pt-syntax-keyword: #d5b9d3;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #b4cde6;
+    --pt-syntax-type: #d5b9d3;
+  }
+  .markdown-doc h1 { font-weight: 500; letter-spacing: -0.045em; }
+  .markdown-doc h2 { font-weight: 500; letter-spacing: -0.025em; }
+  .markdown-doc blockquote { border-inline-start: 1px solid var(--pt-border); }
+  .markdown-doc pre { border: 0; border-radius: 4px; }
+  .markdown-doc :is(th, td) { border-inline: 0; }
+}

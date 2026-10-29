@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Blueprint */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Blueprint";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Expressive";
+    --pt-theme-description: "Uppercase headings, firm rules, and blue accents.";
+    --pt-font-body: "Helvetica Neue", Arial, sans-serif;
+    --pt-font-heading: "Helvetica Neue", Arial, sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 16px;
+    --pt-line-height: 1.7;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.65em;
+    --pt-heading-weight: 700;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fbfcfe;
+    --pt-surface: #eaf0f7;
+    --pt-text: #303b47;
+    --pt-muted: #5e6e82;
+    --pt-heading: #152d4a;
+    --pt-link: #225d95;
+    --pt-border: #bacbdb;
+    --pt-code: #6f4378;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #225d95;
+    --pt-selection-text: #fbfcfe;
+    --pt-syntax-comment: #5e6e82;
+    --pt-syntax-keyword: #6f4378;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #225d95;
+    --pt-syntax-type: #6f4378;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #182332;
+    --pt-surface: #223348;
+    --pt-text: #dce7f5;
+    --pt-muted: #a6bad2;
+    --pt-heading: #f0f5ff;
+    --pt-link: #9dc9f6;
+    --pt-border: #3e5876;
+    --pt-code: #cfb3ed;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #9dc9f6;
+    --pt-selection-text: #182332;
+    --pt-syntax-comment: #a6bad2;
+    --pt-syntax-keyword: #cfb3ed;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #9dc9f6;
+    --pt-syntax-type: #cfb3ed;
+  }
+  .markdown-doc h1 { text-transform: uppercase; font-weight: 800; letter-spacing: -0.04em; border-top: 6px solid var(--pt-heading); padding-top: 0.35em; }
+  .markdown-doc h2 { text-transform: uppercase; letter-spacing: 0.045em; font-size: 1.45em; border-bottom: 2px solid var(--pt-heading); padding-bottom: 0.35em; }
+  .markdown-doc :is(pre, details, :not(pre) > code) { border-radius: 0; }
+  .markdown-doc :is(th, td) { border-inline: 0; }
+  .markdown-doc th { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85em; }
+}

@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Gazette */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Gazette";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Expressive";
+    --pt-theme-description: "Tall serif headlines and a strong red accent.";
+    --pt-font-body: "Helvetica Neue", Arial, sans-serif;
+    --pt-font-heading: Didot, "Bodoni 72", Georgia, serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.75;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.9em;
+    --pt-h2-size: 1.9em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fffaf5;
+    --pt-surface: #f2e9e1;
+    --pt-text: #3c3430;
+    --pt-muted: #77675b;
+    --pt-heading: #2f211d;
+    --pt-link: #a12d2d;
+    --pt-border: #dccac0;
+    --pt-code: #8e4763;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #a12d2d;
+    --pt-selection-text: #fffaf5;
+    --pt-syntax-comment: #77675b;
+    --pt-syntax-keyword: #8e4763;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #a12d2d;
+    --pt-syntax-type: #8e4763;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #28201e;
+    --pt-surface: #3a2c29;
+    --pt-text: #f0e2d8;
+    --pt-muted: #c8b1a1;
+    --pt-heading: #fff0e4;
+    --pt-link: #f0a49a;
+    --pt-border: #60473e;
+    --pt-code: #edb1ce;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #f0a49a;
+    --pt-selection-text: #28201e;
+    --pt-syntax-comment: #c8b1a1;
+    --pt-syntax-keyword: #edb1ce;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #f0a49a;
+    --pt-syntax-type: #edb1ce;
+  }
+  .markdown-doc h1 { letter-spacing: -0.045em; line-height: 1.08; font-weight: 700; padding-bottom: 0.25em; border-bottom: 4px solid var(--pt-link); }
+  .markdown-doc h2 { font-weight: 600; }
+  .markdown-doc blockquote { font-family: var(--pt-font-heading); font-size: 1.2em; font-style: italic; }
+  .markdown-doc :is(th, td) { border-inline: 0; }
+  .markdown-doc pre { border-radius: 0; }
+}

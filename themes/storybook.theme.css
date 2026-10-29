@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Storybook */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Storybook";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reading";
+    --pt-theme-description: "Expressive serif titles and a relaxed book rhythm.";
+    --pt-font-body: Baskerville, Charter, Georgia, serif;
+    --pt-font-heading: "Iowan Old Style", Palatino, serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 19px;
+    --pt-line-height: 1.85;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.65em;
+    --pt-h2-size: 1.8em;
+    --pt-block-gap: 1.2em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fdf9f1;
+    --pt-surface: #f1e9db;
+    --pt-text: #40382f;
+    --pt-muted: #766755;
+    --pt-heading: #4b342c;
+    --pt-link: #8b482f;
+    --pt-border: #d9cbb5;
+    --pt-code: #85505b;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #8b482f;
+    --pt-selection-text: #fdf9f1;
+    --pt-syntax-comment: #766755;
+    --pt-syntax-keyword: #85505b;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #8b482f;
+    --pt-syntax-type: #85505b;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #29231e;
+    --pt-surface: #382f27;
+    --pt-text: #eee2cf;
+    --pt-muted: #c3b298;
+    --pt-heading: #fff0d4;
+    --pt-link: #e7ad81;
+    --pt-border: #5b4b3b;
+    --pt-code: #e3acc1;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #e7ad81;
+    --pt-selection-text: #29231e;
+    --pt-syntax-comment: #c3b298;
+    --pt-syntax-keyword: #e3acc1;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #e7ad81;
+    --pt-syntax-type: #e3acc1;
+  }
+  .markdown-doc h1 { font-weight: 600; letter-spacing: -0.04em; }
+  .markdown-doc h2 { font-weight: 600; font-style: italic; }
+  .markdown-doc blockquote { font-style: italic; border-inline-start: 1px solid var(--pt-link); }
+  .markdown-doc :is(pre, details) { border-radius: 2px; }
+}

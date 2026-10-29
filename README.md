@@ -117,7 +117,9 @@ See [the editing guide](docs/help/editing.md) and [the comments guide](docs/help
 
 ## Themes
 
-Ten themes include light and dark palettes: Native, Parchment, Editorial, Terminal, Nordic, Ocean, Forest, Rose, Graphite, and Bookish.
+Twenty themes cover reports, reference documents, reading, quiet layouts, expressive typography, and evening palettes. Each theme includes light and dark styles and uses fonts installed on your Mac.
+
+Browse themes by category in the theme panel. Each selection includes a short description and a live preview. See [the theme catalog](docs/theming.md#bundled-themes) for all names and styles.
 
 The theme panel provides appearance, font, size, and text-color settings. It also supports CSS import, preview, and custom theme copies. Custom themes live in `~/Library/Application Support/Parchment/Themes/`.
 

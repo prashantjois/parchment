@@ -16,6 +16,7 @@ import ParchmentCore
         app.setActivationPolicy(.prohibited)
         let runner = ThemeChecks(); active = runner
         runner.checkApplicationAppearance()
+        runner.checkCatalogMigration()
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(runner, name: "parchment")
         runner.web = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), configuration: configuration)
@@ -55,6 +56,43 @@ import ParchmentCore
                NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]),
                "System clears the override and follows macOS again")
     }
+    func checkCatalogMigration() {
+        let domain = "parchment-theme-migration-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        let original = NSApp.appearance
+        defer { NSApp.appearance = original; defaults.removePersistentDomain(forName: domain) }
+        func expect(_ condition: Bool, _ label: String) {
+            print("\(condition ? "PASS" : "FAIL") \(label)")
+            if !condition { failures += 1 }
+        }
+        let fresh = ThemeLibrary(defaults: defaults)
+        expect(fresh.selectedID == "vellum" && fresh.selected?.name == "Vellum", "new installs select Vellum")
+        expect(fresh.items.filter { !$0.custom }.count == 20, "the refreshed bundle contains twenty themes without stale styles")
+        let catalog = fresh.items.filter { !$0.custom }
+        expect(Set(catalog.map(\.category)).count == 6 && catalog.allSatisfy {
+            ThemeLibrary.categories.contains($0.category) && $0.summary != "Custom document styles."
+        }, "bundled themes provide categories and descriptions")
+        for (old, target) in ThemeLibrary.legacyIDs {
+            defaults.set(old, forKey: "theme")
+            defaults.set(23, forKey: "fontSize")
+            defaults.set("dark", forKey: "appearance")
+            let migrated = ThemeLibrary(defaults: defaults)
+            expect(migrated.selectedID == target && migrated.selected?.id == target && defaults.string(forKey: "theme") == target &&
+                   migrated.fontSize == 23 && migrated.appearance == "dark", "\(old) migrates to \(target) and preserves overrides")
+        }
+        // Use an isolated custom directory entry and remove only this fixture.
+        let id = "migration-check-" + UUID().uuidString
+        let path = fresh.customDirectory.appendingPathComponent(id + ".theme.css")
+        do {
+            let css = #"@layer parchment-theme { .markdown-doc { --pt-theme-name: "Custom check"; --pt-theme-version: 1; } }"#
+            try css.write(to: path, atomically: true, encoding: .utf8)
+            defer { try? FileManager.default.removeItem(at: path) }
+            defaults.set("custom-" + id, forKey: "theme")
+            let custom = ThemeLibrary(defaults: defaults)
+            expect(custom.selected?.id == "custom-" + id && custom.selected?.category == "Custom" && custom.selected?.css == css,
+                   "custom theme selection and CSS survive the catalog update")
+        } catch { expect(false, "custom theme fixture: \(error)") }
+    }
     func next() {
         guard index < builtins.count else {
             print("\(builtins.count * 2) WebKit theme/appearance checks, \(failures) failures")
@@ -63,7 +101,7 @@ import ParchmentCore
         let theme = builtins[index]
         ThemeCSSValidator.validate(theme.css) { [self] result in
             if case .failure(let error) = result { failures += 1; print("FAIL \(theme.name) validation: \(error.localizedDescription)") }
-            let source = "# Heading\n\nA **bold** thought.\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\n| A | B |\n| --- | --- |\n| C | D |\n\n```swift\nlet answer = 42\n```"
+            let source = "# Heading\n\nA **bold** thought with a [link](https://example.com) and `inline code`.\n\n> A quote to keep in mind.\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\n| A | B |\n| --- | --- |\n| C | D |\n\n```swift\nlet answer = 42\n```"
             let rendered = MarkdownRenderer.render(source + "\n\n![One](http://127.0.0.1:1/one.png)\n\n![Two](http://127.0.0.1:1/two.png)")
             let css = Data((library.baseCSS + "\n" + theme.css + "\n@layer parchment-user { .markdown-doc { --pt-syntax-keyword: #010203; } }").utf8).base64EncodedString()
             let html = """
@@ -84,9 +122,35 @@ import ParchmentCore
           if (style.backgroundColor === 'rgba(0, 0, 0, 0)') errors.push('Missing background');
           if (parseFloat(style.fontSize) < 14) errors.push('Missing font size');
           if (style.color === style.backgroundColor) errors.push('Invisible body text');
+          function luminance(color) {
+            const rgb = color.match(/[\d.]+/g).slice(0,3).map(Number).map(v => v/255);
+            return rgb.map(v => v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4)
+                      .reduce((sum,v,i) => sum + v*[.2126,.7152,.0722][i],0);
+          }
+          function contrast(foreground, background, label, minimum=4.5) {
+            const a=luminance(foreground), b=luminance(background);
+            const ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            if (ratio < minimum) errors.push(label+' contrast '+ratio.toFixed(2)+' < '+minimum);
+          }
+          contrast(style.color,style.backgroundColor,'Body');
+          const quote=getComputedStyle(document.querySelector('blockquote'));
+          contrast(quote.color,style.backgroundColor,'Quote');
+          const link=getComputedStyle(document.querySelector('a'));
+          contrast(link.color,style.backgroundColor,'Link');
+          const block=getComputedStyle(document.querySelector('pre'));
+          contrast(block.color,block.backgroundColor,'Code');
+          const inline=getComputedStyle(document.querySelector('p code'));
+          contrast(inline.color,inline.backgroundColor,'Inline code');
+          for (const token of document.querySelectorAll('.token:not(.keyword)')) {
+            contrast(getComputedStyle(token).color,block.backgroundColor,'Syntax token');
+          }
+          const selected=getComputedStyle(root,'::selection');
+          contrast(selected.color,selected.backgroundColor,'Selection');
+          if (document.querySelectorAll('link[rel="stylesheet"]').length || document.fonts.size) errors.push('Theme loads external fonts');
           if (parseFloat(style.paddingLeft) !== 16 || parseFloat(style.paddingRight) !== 16) errors.push('Rendered content must use the full width with 16px margins');
           for (let i=1;i<=6;i++) {
             const heading = getComputedStyle(document.querySelector('h'+i));
+            contrast(heading.color,style.backgroundColor,'Heading '+i,3);
             if (parseFloat(heading.fontSize) < parseFloat(style.fontSize)) errors.push('Invalid heading size '+i);
           }
           if (typeof setComments !== 'function' || typeof jumpToSource !== 'function') errors.push('Preview bridge failed to load');

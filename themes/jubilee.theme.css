@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Jubilee */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Jubilee";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Expressive";
+    --pt-theme-description: "Large geometric headings and vivid purple accents.";
+    --pt-font-body: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.75;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.85em;
+    --pt-h2-size: 1.85em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fff8ee;
+    --pt-surface: #f2e7d5;
+    --pt-text: #3e3148;
+    --pt-muted: #766279;
+    --pt-heading: #44245c;
+    --pt-link: #7931a1;
+    --pt-border: #decae5;
+    --pt-code: #a13169;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #7931a1;
+    --pt-selection-text: #fff8ee;
+    --pt-syntax-comment: #766279;
+    --pt-syntax-keyword: #a13169;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #7931a1;
+    --pt-syntax-type: #a13169;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #2b1e33;
+    --pt-surface: #3b2946;
+    --pt-text: #f2e2f7;
+    --pt-muted: #cbb0d2;
+    --pt-heading: #f9e8ff;
+    --pt-link: #dfb0fa;
+    --pt-border: #624370;
+    --pt-code: #f2acd0;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #dfb0fa;
+    --pt-selection-text: #2b1e33;
+    --pt-syntax-comment: #cbb0d2;
+    --pt-syntax-keyword: #f2acd0;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #dfb0fa;
+    --pt-syntax-type: #f2acd0;
+  }
+  .markdown-doc h1 { letter-spacing: -0.055em; font-weight: 800; }
+  .markdown-doc h2 { letter-spacing: -0.035em; font-weight: 750; }
+  .markdown-doc blockquote { background: var(--pt-surface); border-radius: 0 16px 16px 0; border-inline-start-width: 5px; }
+  .markdown-doc pre { border-radius: 12px; }
+  .markdown-doc a { text-decoration-thickness: 2px; }
+}

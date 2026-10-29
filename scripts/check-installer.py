@@ -59,6 +59,10 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
     resources = app / 'Contents/Resources'
     assert not list(resources.rglob('*.comments.json'))
     assert not list(resources.rglob('*.review.json'))
+    expected_themes = {path.name: path.read_bytes() for path in (repository / 'themes').glob('*.css')}
+    packaged_themes = {path.name: path.read_bytes() for path in (resources / 'themes').glob('*.css')}
+    assert packaged_themes == expected_themes, 'Packaged themes must match the current catalog without retired files'
+    print('PASS packaged theme catalog matches source without retired styles')
     for document in (repository / 'docs').rglob('*.md'):
         assert (resources / document.relative_to(repository)).read_bytes() == document.read_bytes()
     markdown_type = next(item for item in info['UTImportedTypeDeclarations'] if item['UTTypeIdentifier'] == 'net.daringfireball.markdown')

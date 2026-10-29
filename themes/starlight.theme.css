@@ -1,0 +1,60 @@
+/* Parchment Theme CSS v1: Starlight */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Starlight";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Evening";
+    --pt-theme-description: "Navy and gold with lyrical serif typography.";
+    --pt-font-body: "Iowan Old Style", Palatino, Georgia, serif;
+    --pt-font-heading: "Iowan Old Style", Palatino, Georgia, serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 19px;
+    --pt-line-height: 1.85;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.55em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #faf8f0;
+    --pt-surface: #ede9da;
+    --pt-text: #343c50;
+    --pt-muted: #656879;
+    --pt-heading: #26334f;
+    --pt-link: #83621c;
+    --pt-border: #d1c8aa;
+    --pt-code: #775976;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #83621c;
+    --pt-selection-text: #faf8f0;
+    --pt-syntax-comment: #656879;
+    --pt-syntax-keyword: #775976;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #83621c;
+    --pt-syntax-type: #775976;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #172033;
+    --pt-surface: #222e46;
+    --pt-text: #e2e5ef;
+    --pt-muted: #aebad0;
+    --pt-heading: #f7e8c4;
+    --pt-link: #e6c47c;
+    --pt-border: #435272;
+    --pt-code: #d3b4dc;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #e6c47c;
+    --pt-selection-text: #172033;
+    --pt-syntax-comment: #aebad0;
+    --pt-syntax-keyword: #d3b4dc;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #e6c47c;
+    --pt-syntax-type: #d3b4dc;
+  }
+  .markdown-doc h1 { letter-spacing: -0.035em; font-weight: 600; border-bottom: 1px solid var(--pt-link); padding-bottom: 0.4em; }
+  .markdown-doc h2 { font-style: italic; font-weight: 600; }
+  .markdown-doc blockquote { border-inline-start-width: 1px; font-style: italic; }
+  .markdown-doc pre { border-radius: 4px; }
+}

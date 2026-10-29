@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Periodical */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Periodical";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reading";
+    --pt-theme-description: "Centered titles, fine rules, and small-cap subheadings.";
+    --pt-font-body: "Hoefler Text", Baskerville, Georgia, serif;
+    --pt-font-heading: "Hoefler Text", Baskerville, Georgia, serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 19px;
+    --pt-line-height: 1.8;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.5em;
+    --pt-h2-size: 1.65em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fdfcf9;
+    --pt-surface: #f0eeea;
+    --pt-text: #373331;
+    --pt-muted: #726b64;
+    --pt-heading: #252220;
+    --pt-link: #744641;
+    --pt-border: #d7d0c8;
+    --pt-code: #77516c;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #744641;
+    --pt-selection-text: #fdfcf9;
+    --pt-syntax-comment: #726b64;
+    --pt-syntax-keyword: #77516c;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #744641;
+    --pt-syntax-type: #77516c;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #242221;
+    --pt-surface: #322e2b;
+    --pt-text: #e9e3db;
+    --pt-muted: #bfb3a7;
+    --pt-heading: #f7efe5;
+    --pt-link: #e5b5ad;
+    --pt-border: #514a43;
+    --pt-code: #d8b5d1;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #e5b5ad;
+    --pt-selection-text: #242221;
+    --pt-syntax-comment: #bfb3a7;
+    --pt-syntax-keyword: #d8b5d1;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #e5b5ad;
+    --pt-syntax-type: #d8b5d1;
+  }
+  .markdown-doc h1 { text-align: center; font-weight: 500; letter-spacing: -0.025em; padding-bottom: 0.6em; border-bottom: 1px solid var(--pt-heading); }
+  .markdown-doc h2 { font-variant-caps: small-caps; letter-spacing: 0.04em; font-weight: 600; }
+  .markdown-doc blockquote { text-align: center; font-style: italic; border: 0; padding: 0.8em 1.5em; }
+  .markdown-doc pre { border-radius: 0; }
+}

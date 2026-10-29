@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Flare */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Flare";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reports";
+    --pt-theme-description: "Bold black type with a single orange accent.";
+    --pt-font-body: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.65;
+    --pt-content-width: 100%;
+    --pt-heading-weight: 750;
+    --pt-h1-size: 2.6em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fffdf9;
+    --pt-surface: #f4eee6;
+    --pt-text: #302a25;
+    --pt-muted: #736252;
+    --pt-heading: #211e1b;
+    --pt-link: #a64110;
+    --pt-border: #dfd0c0;
+    --pt-code: #8c4530;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #a64110;
+    --pt-selection-text: #fffdf9;
+    --pt-syntax-comment: #736252;
+    --pt-syntax-keyword: #8c4530;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #a64110;
+    --pt-syntax-type: #8c4530;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #211e1b;
+    --pt-surface: #322b25;
+    --pt-text: #f1e7dc;
+    --pt-muted: #c3b2a0;
+    --pt-heading: #fff4e7;
+    --pt-link: #ffa66d;
+    --pt-border: #564638;
+    --pt-code: #edb397;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #ffa66d;
+    --pt-selection-text: #211e1b;
+    --pt-syntax-comment: #c3b2a0;
+    --pt-syntax-keyword: #edb397;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #ffa66d;
+    --pt-syntax-type: #edb397;
+  }
+  .markdown-doc h1 { border-inline-start: 5px solid var(--pt-link); padding-inline-start: 0.5em; letter-spacing: -0.04em; }
+  .markdown-doc h2 { letter-spacing: -0.025em; }
+  .markdown-doc blockquote { border-inline-start-width: 2px; }
+  .markdown-doc pre { border-radius: 3px; }
+}

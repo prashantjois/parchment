@@ -1,0 +1,60 @@
+/* Parchment Theme CSS v1: Canopy */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Canopy";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reports";
+    --pt-theme-description: "Deep green headings and warm, spacious pages.";
+    --pt-font-body: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.75;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.35em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fbfaf5;
+    --pt-surface: #eeeee3;
+    --pt-text: #303d34;
+    --pt-muted: #5c6c60;
+    --pt-heading: #254b36;
+    --pt-link: #34704a;
+    --pt-border: #ced8c9;
+    --pt-code: #805645;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #34704a;
+    --pt-selection-text: #fbfaf5;
+    --pt-syntax-comment: #5c6c60;
+    --pt-syntax-keyword: #805645;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #34704a;
+    --pt-syntax-type: #805645;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #19251f;
+    --pt-surface: #24352b;
+    --pt-text: #e0e9dc;
+    --pt-muted: #adbdab;
+    --pt-heading: #e7f4df;
+    --pt-link: #a5d3a0;
+    --pt-border: #425a48;
+    --pt-code: #e1baa1;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #a5d3a0;
+    --pt-selection-text: #19251f;
+    --pt-syntax-comment: #adbdab;
+    --pt-syntax-keyword: #e1baa1;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #a5d3a0;
+    --pt-syntax-type: #e1baa1;
+  }
+  .markdown-doc h1 { letter-spacing: -0.035em; }
+  .markdown-doc h2 { padding-bottom: 0.3em; border-bottom: 1px solid var(--pt-border); }
+  .markdown-doc blockquote { border-radius: 0 10px 10px 0; background: var(--pt-surface); }
+  .markdown-doc th { font-weight: 650; }
+}

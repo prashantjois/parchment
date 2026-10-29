@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Keystroke */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Keystroke";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reference";
+    --pt-theme-description: "Monospace throughout, with understated blue details.";
+    --pt-font-body: "SF Mono", Menlo, monospace;
+    --pt-font-heading: "SF Mono", Menlo, monospace;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 15px;
+    --pt-line-height: 1.8;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2em;
+    --pt-h2-size: 1.55em;
+    --pt-heading-weight: 700;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fcfcfb;
+    --pt-surface: #efefed;
+    --pt-text: #323539;
+    --pt-muted: #666970;
+    --pt-heading: #20252b;
+    --pt-link: #305e8a;
+    --pt-border: #cfd3d8;
+    --pt-code: #73435e;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #305e8a;
+    --pt-selection-text: #fcfcfb;
+    --pt-syntax-comment: #666970;
+    --pt-syntax-keyword: #73435e;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #305e8a;
+    --pt-syntax-type: #73435e;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #1d2025;
+    --pt-surface: #292d34;
+    --pt-text: #e0e4ea;
+    --pt-muted: #afb6c1;
+    --pt-heading: #f0f3f8;
+    --pt-link: #9fc4f0;
+    --pt-border: #464d58;
+    --pt-code: #d5aecb;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #9fc4f0;
+    --pt-selection-text: #1d2025;
+    --pt-syntax-comment: #afb6c1;
+    --pt-syntax-keyword: #d5aecb;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #9fc4f0;
+    --pt-syntax-type: #d5aecb;
+  }
+  .markdown-doc h1 { letter-spacing: -0.045em; border-bottom: 2px solid var(--pt-heading); padding-bottom: 0.45em; }
+  .markdown-doc h2 { letter-spacing: -0.025em; }
+  .markdown-doc :is(pre, blockquote, details) { border-radius: 0; }
+  .markdown-doc th { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85em; }
+}

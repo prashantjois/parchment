@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Vellum */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Vellum";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reading";
+    --pt-theme-description: "Warm paper, soft brown ink, and generous serif text.";
+    --pt-font-body: Charter, Georgia, serif;
+    --pt-font-heading: Palatino, "Iowan Old Style", serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 18px;
+    --pt-line-height: 1.85;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.5em;
+    --pt-block-gap: 1.15em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #faf3e6;
+    --pt-surface: #eee3d0;
+    --pt-text: #45392d;
+    --pt-muted: #75634e;
+    --pt-heading: #36291e;
+    --pt-link: #87501d;
+    --pt-border: #d6c5a9;
+    --pt-code: #884b37;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #87501d;
+    --pt-selection-text: #faf3e6;
+    --pt-syntax-comment: #75634e;
+    --pt-syntax-keyword: #884b37;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #87501d;
+    --pt-syntax-type: #884b37;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #28221b;
+    --pt-surface: #382f24;
+    --pt-text: #ecdfc9;
+    --pt-muted: #c4b293;
+    --pt-heading: #fff0d5;
+    --pt-link: #e7bf7e;
+    --pt-border: #5b4b36;
+    --pt-code: #e5ad93;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #e7bf7e;
+    --pt-selection-text: #28221b;
+    --pt-syntax-comment: #c4b293;
+    --pt-syntax-keyword: #e5ad93;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #e7bf7e;
+    --pt-syntax-type: #e5ad93;
+  }
+  .markdown-doc h1 { letter-spacing: -0.04em; font-weight: 600; }
+  .markdown-doc h2 { border-bottom: 1px solid var(--pt-border); padding-bottom: 0.3em; font-weight: 600; }
+  .markdown-doc blockquote { font-style: italic; }
+  .markdown-doc pre { border-radius: 3px; }
+}

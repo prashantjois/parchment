@@ -1,0 +1,62 @@
+/* Parchment Theme CSS v1: Academy */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Academy";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Reading";
+    --pt-theme-description: "Formal serif text, centered titles, and restrained blue.";
+    --pt-font-body: Baskerville, "Times New Roman", serif;
+    --pt-font-heading: Baskerville, "Times New Roman", serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 19px;
+    --pt-line-height: 1.85;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.35em;
+    --pt-h2-size: 1.6em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fffefa;
+    --pt-surface: #f1f0ea;
+    --pt-text: #30343a;
+    --pt-muted: #646b72;
+    --pt-heading: #242a32;
+    --pt-link: #355b85;
+    --pt-border: #d2d5d7;
+    --pt-code: #75516a;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #355b85;
+    --pt-selection-text: #fffefa;
+    --pt-syntax-comment: #646b72;
+    --pt-syntax-keyword: #75516a;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #355b85;
+    --pt-syntax-type: #75516a;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #20242a;
+    --pt-surface: #2b323a;
+    --pt-text: #e1e5eb;
+    --pt-muted: #adb8c4;
+    --pt-heading: #f0f3f8;
+    --pt-link: #a7c3e7;
+    --pt-border: #48535f;
+    --pt-code: #d6b3cc;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #a7c3e7;
+    --pt-selection-text: #20242a;
+    --pt-syntax-comment: #adb8c4;
+    --pt-syntax-keyword: #d6b3cc;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #a7c3e7;
+    --pt-syntax-type: #d6b3cc;
+  }
+  .markdown-doc h1 { text-align: center; font-weight: 600; padding-bottom: 0.45em; border-bottom: 1px solid var(--pt-border); }
+  .markdown-doc p { text-align: justify; hyphens: auto; }
+  .markdown-doc blockquote { font-size: 0.95em; font-style: italic; border-inline-start-width: 1px; }
+  .markdown-doc :is(th, td) { border-inline: 0; }
+  .markdown-doc pre { border-radius: 0; }
+}

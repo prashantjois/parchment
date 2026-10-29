@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Fireside */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Fireside";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Evening";
+    --pt-theme-description: "Warm amber accents and comfortable humanist type.";
+    --pt-font-body: Optima, "Avenir Next", sans-serif;
+    --pt-font-heading: Optima, "Avenir Next", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 18px;
+    --pt-line-height: 1.8;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.45em;
+    --pt-block-gap: 1.2em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fff7e9;
+    --pt-surface: #f0e3cb;
+    --pt-text: #483927;
+    --pt-muted: #766349;
+    --pt-heading: #533818;
+    --pt-link: #89510e;
+    --pt-border: #dbc39b;
+    --pt-code: #8e5140;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #89510e;
+    --pt-selection-text: #fff7e9;
+    --pt-syntax-comment: #766349;
+    --pt-syntax-keyword: #8e5140;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #89510e;
+    --pt-syntax-type: #8e5140;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #282018;
+    --pt-surface: #392d20;
+    --pt-text: #f1e3cd;
+    --pt-muted: #c9b38f;
+    --pt-heading: #fff0d2;
+    --pt-link: #edc070;
+    --pt-border: #604a2d;
+    --pt-code: #e5b296;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #edc070;
+    --pt-selection-text: #282018;
+    --pt-syntax-comment: #c9b38f;
+    --pt-syntax-keyword: #e5b296;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #edc070;
+    --pt-syntax-type: #e5b296;
+  }
+  .markdown-doc h1 { font-weight: 600; letter-spacing: -0.035em; }
+  .markdown-doc h2 { font-weight: 600; }
+  .markdown-doc blockquote { font-style: italic; background: var(--pt-surface); border-radius: 0 12px 12px 0; }
+  .markdown-doc pre { border-radius: 8px; }
+}

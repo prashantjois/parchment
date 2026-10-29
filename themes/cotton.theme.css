@@ -1,0 +1,61 @@
+/* Parchment Theme CSS v1: Cotton */
+@layer parchment-theme {
+  .markdown-doc {
+    --pt-theme-name: "Cotton";
+    --pt-theme-version: 1;
+    --pt-theme-category: "Quiet";
+    --pt-theme-description: "Soft neutral colors and gently rounded details.";
+    --pt-font-body: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-heading: "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    --pt-font-code: "SF Mono", Menlo, monospace;
+    --pt-font-size: 17px;
+    --pt-line-height: 1.8;
+    --pt-content-width: 100%;
+    --pt-h1-size: 2.3em;
+    --pt-block-gap: 1.25em;
+  }
+  .markdown-doc[data-appearance="light"] {
+    --pt-background: #fbfaf7;
+    --pt-surface: #efede6;
+    --pt-text: #3f403b;
+    --pt-muted: #6d6c64;
+    --pt-heading: #343730;
+    --pt-link: #526b55;
+    --pt-border: #d9d9cd;
+    --pt-code: #7b5c68;
+    --pt-mark-background: #f3df9d;
+    --pt-mark-text: #34290e;
+    --pt-selection-background: #526b55;
+    --pt-selection-text: #fbfaf7;
+    --pt-syntax-comment: #6d6c64;
+    --pt-syntax-keyword: #7b5c68;
+    --pt-syntax-string: #24673e;
+    --pt-syntax-number: #89501a;
+    --pt-syntax-function: #526b55;
+    --pt-syntax-type: #7b5c68;
+  }
+  .markdown-doc[data-appearance="dark"] {
+    --pt-background: #252722;
+    --pt-surface: #32362d;
+    --pt-text: #e7e8db;
+    --pt-muted: #b8bda9;
+    --pt-heading: #f3f4e7;
+    --pt-link: #bed3a8;
+    --pt-border: #505744;
+    --pt-code: #d9bacb;
+    --pt-mark-background: #675022;
+    --pt-mark-text: #fff0bd;
+    --pt-selection-background: #bed3a8;
+    --pt-selection-text: #252722;
+    --pt-syntax-comment: #b8bda9;
+    --pt-syntax-keyword: #d9bacb;
+    --pt-syntax-string: #aad9b1;
+    --pt-syntax-number: #efc38b;
+    --pt-syntax-function: #bed3a8;
+    --pt-syntax-type: #d9bacb;
+  }
+  .markdown-doc h1 { font-weight: 600; letter-spacing: -0.035em; }
+  .markdown-doc h2 { font-weight: 600; }
+  .markdown-doc blockquote { border: 0; background: var(--pt-surface); border-radius: 12px; padding: 1em 1.2em; }
+  .markdown-doc :is(pre, details) { border-radius: 12px; }
+}
