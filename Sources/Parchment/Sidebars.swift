@@ -268,7 +268,9 @@ struct ThreadCard: View {
                         Text(message.timestamp, style: .date).font(.caption2).foregroundStyle(.secondary)
                     }
                     if editingMessage == message.id {
-                        TextField("Comment", text: $editedBody, axis: .vertical).lineLimit(2...8).textFieldStyle(.roundedBorder)
+                        ExpandableCommentInput(text: $editedBody, title: "Edit Comment", placeholder: "Comment",
+                                               context: thread.isFileLevel ? "Entire file · \(document.title)" : thread.anchor.quote,
+                                               lineLimit: 2...8)
                         HStack {
                             Button("Save Draft") { document.editPendingMessage(message.id, in: thread.id, body: editedBody); editingMessage = nil }.buttonFeedback("Save changes to this pending comment").disabled(editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             Button("Cancel") { editingMessage = nil }.buttonFeedback("Cancel changes to this pending comment")
@@ -287,7 +289,8 @@ struct ThreadCard: View {
                 }
             }
             if !thread.isResolved {
-                TextField("Reply to this thread…", text: $reply, axis: .vertical).lineLimit(2...6).textFieldStyle(.roundedBorder)
+                ExpandableCommentInput(text: $reply, title: "Reply to Thread", placeholder: "Reply to this thread…",
+                                       context: thread.isFileLevel ? "Entire file · \(document.title)" : thread.anchor.quote)
                 HStack {
                     Button(document.comments.activeReview != nil ? "Add to Review" : "Reply") {
                         document.addReply(reply, to: thread.id, pending: document.comments.activeReview != nil); reply = ""
@@ -318,11 +321,61 @@ struct ThreadCard: View {
     }
 }
 
+struct ExpandableCommentInput: View {
+    @Binding var text: String
+    var title: String
+    var placeholder: String
+    var context: String
+    var lineLimit = 2...6
+    @ViewState private var expanded = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            TextField(placeholder, text: $text, axis: .vertical)
+                .lineLimit(lineLimit).textFieldStyle(.roundedBorder)
+            Button { expanded = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 24, height: 24)
+            }.buttonStyle(.borderless).buttonFeedback("Open in a larger comment editor")
+                .accessibilityLabel("Expand comment editor")
+        }
+        .sheet(isPresented: $expanded) {
+            ExpandedCommentEditor(text: $text, title: title, context: context)
+        }
+    }
+}
+
+struct ExpandedCommentEditor: View {
+    @Binding var text: String
+    var title: String
+    var context: String
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title).font(.title2.bold())
+            Text(context).font(.callout).lineLimit(3).padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            TextEditor(text: $text).font(.body).focused($focused)
+                .padding(6).border(.quaternary).accessibilityLabel(title)
+            HStack {
+                Text("Your text stays in the draft until you submit it.").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                    .buttonFeedback("Return to the comment with your draft intact (Escape)")
+            }
+        }.padding(24).frame(width: 760, height: 560)
+            .onAppear { focused = true }
+    }
+}
+
 struct CommentComposer: View {
     @ObservedObject var document: EditorDocument
     @Environment(\.dismiss) private var dismiss
     @ViewState<String> private var bodyText = ""
     @ViewState<String?> private var error: String?
+    @ViewState private var expanded = false
     @FocusState private var focused: Bool
     var quote: String {
         if document.commentDraftIsFileLevel { return "Entire file · \(document.title)" }
@@ -332,9 +385,16 @@ struct CommentComposer: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(document.commentDraftIsFileLevel ? "Add File Comment" : "Add Comment").font(.title2.bold())
+            HStack {
+                Text(document.commentDraftIsFileLevel ? "Add File Comment" : "Add Comment").font(.title2.bold())
+                Spacer()
+                Button { expanded.toggle(); focused = true } label: {
+                    Image(systemName: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                }.buttonStyle(.borderless).buttonFeedback(expanded ? "Collapse comment editor" : "Expand comment editor")
+                    .accessibilityLabel(expanded ? "Collapse comment editor" : "Expand comment editor")
+            }
             Text(quote).font(.callout).lineLimit(6).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-            TextEditor(text: $bodyText).font(.body).frame(height: 130).focused($focused).border(.quaternary)
+            TextEditor(text: $bodyText).font(.body).frame(height: expanded ? 360 : 130).focused($focused).border(.quaternary)
             if let error { Text(error).font(.caption).foregroundStyle(.red) }
             HStack {
                 Text(document.url == nil ? "Save this document to create its companion file." : "Saved beside \(document.title)").font(.caption).foregroundStyle(.secondary)
@@ -349,7 +409,7 @@ struct CommentComposer: View {
                 }
             }
             Text(document.comments.activeReview == nil ? "Comment now publishes immediately. Start a review keeps your comments pending until submission." : "Review comments stay pending until you submit the review. Comment now publishes this comment immediately.").font(.caption).foregroundStyle(.secondary)
-        }.padding(24).frame(width: 560).onAppear { focused = true }
+        }.padding(24).frame(width: expanded ? 760 : 560).onAppear { focused = true }
             .onDisappear { document.commentDraftAnchor = nil; document.commentDraftIsFileLevel = false }
     }
     var cannotSubmit: Bool { bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || quote.isEmpty }
