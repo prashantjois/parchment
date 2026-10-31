@@ -15,5 +15,6 @@ console_uid="$(/usr/bin/id -u "$console_user")"
 script_directory="$(cd "$(dirname "$0")" && pwd)"
 # Read package resources as the installer, but write only as the logged-in user.
 /bin/launchctl asuser "$console_uid" /usr/bin/sudo -n -H -u "$console_user" \
-    /bin/bash -c "$(cat "$script_directory/install-skill.sh")" \
+    /bin/bash -c "$(cat "$script_directory/install-skill.sh")" -- "" \
+    /Applications/Parchment.app/Contents/Resources/skills/parchment/references \
     < "$script_directory/SKILL.md"

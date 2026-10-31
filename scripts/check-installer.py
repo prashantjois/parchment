@@ -77,15 +77,29 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
     scripts = expanded / 'Parchment-skill.pkg/Scripts'
     skill = (scripts / 'SKILL.md').read_bytes()
     assert skill == (repository / 'skills/parchment/SKILL.md').read_bytes()
+    references = resources / 'skills/parchment/references'
+    expected_references = {path.name: path.read_bytes() for path in (repository / 'skills/parchment/references').glob('*.md')}
+    assert expected_references
+    assert {path.name: path.read_bytes() for path in references.glob('*.md')} == expected_references
     destination = root / 'user-skills/parchment'
 
     def install(content):
-        return subprocess.run(['bash', str(scripts / 'install-skill.sh'), str(destination)], input=content, capture_output=True)
+        return subprocess.run(['bash', str(scripts / 'install-skill.sh'), str(destination), str(references)], input=content, capture_output=True)
 
     assert install(skill).returncode == 0
     assert (destination / 'SKILL.md').read_bytes() == skill
+    assert {path.name: path.read_bytes() for path in (destination / 'references').glob('*.md')} == expected_references
     assert install(skill).returncode == 0
     assert not list(destination.glob('SKILL.md.backup.*'))
+    reference_name = next(iter(expected_references))
+    reference_path = destination / 'references' / reference_name
+    reference_path.write_text('Custom wake-up instructions')
+    assert install(skill).returncode == 0
+    assert reference_path.read_bytes() == expected_references[reference_name]
+    reference_backups = list(reference_path.parent.glob(reference_name + '.backup.*'))
+    assert len(reference_backups) == 1 and reference_backups[0].read_text() == 'Custom wake-up instructions'
+    assert install(skill).returncode == 0
+    assert len(list(reference_path.parent.glob(reference_name + '.backup.*'))) == 1
     (destination / 'SKILL.md').write_text('User customizations')
     assert install(skill).returncode == 0
     backups = list(destination.glob('SKILL.md.backup.*'))
@@ -93,4 +107,5 @@ with tempfile.TemporaryDirectory(prefix='parchment-installer-check-') as tempora
     assert install(b'').returncode != 0
     assert (destination / 'SKILL.md').read_bytes() == skill
     assert not list(destination.glob('.SKILL.md.*'))
+    assert not list((destination / 'references').glob('.reference.*'))
     print('PASS packaged scripts, app signature, skill install, repeat install, backup, and empty-input protection')
