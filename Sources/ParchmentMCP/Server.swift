@@ -52,6 +52,7 @@ final class MCPServer: @unchecked Sendable {
     private let lock = NSLock()
     private var tasks: [String: Task<Void, Never>] = [:]
     private var initialized = false
+    private var stopped = false
     init() throws {
         let registry = try IntegrationRegistry()
         self.registry = registry
@@ -108,12 +109,20 @@ final class MCPServer: @unchecked Sendable {
     private func finish(_ key: String) { lock.lock(); tasks.removeValue(forKey: key); lock.unlock() }
     func stop() {
         keepAlives.stop()
-        lock.lock(); tasks.values.forEach { $0.cancel() }; lock.unlock()
+        lock.lock(); stopped = true; tasks.values.forEach { $0.cancel() }; lock.unlock()
+    }
+    private func checkConnection() throws {
+        try Task.checkCancellation()
+        lock.lock(); defer { lock.unlock() }
+        if stopped { throw CancellationError() }
     }
     func call(_ params: JSON) async throws -> JSON {
         let name = try params.require("name"), args = params["arguments"] == .null ? JSON.object([:]) : params["arguments"]
         try ToolCatalog.validate(name, args)
-        try Task.checkCancellation()
+        try checkConnection()
+        // Any authenticated request proves that this conversation is connected.
+        // Reconnects must not depend on calling resume_session before other tools.
+        if let token = args["session_token"].string { try keepAlives.track(token) }
         switch name {
         case "create_session", "update_session":
             if name == "update_session" { _ = try registry.session(args.require("session_token")) }
@@ -131,10 +140,7 @@ final class MCPServer: @unchecked Sendable {
             try keepAlives.track(session.require("session_token"))
             return session
         case "list_sessions": return try registry.registeredSessions()
-        case "resume_session":
-            let token = try args.require("session_token")
-            try keepAlives.track(token)
-            return try registry.session(token)
+        case "resume_session": return try registry.session(args.require("session_token"))
         case "keep_alive": return try keepAlives.track(args.require("session_token"))
         case "register_receiver":
             _ = try registry.session(args.require("session_token"))
@@ -159,7 +165,7 @@ final class MCPServer: @unchecked Sendable {
             guard (0...25).contains(timeout) else { throw BridgeError("INVALID_ARGUMENT", "timeout_seconds must be between 0 and 25.") }
             let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
             while true {
-                try Task.checkCancellation()
+                try checkConnection()
                 let events = try registry.sessionEvents(args)
                 if !events["events"].array.isEmpty || ContinuousClock.now >= deadline { return events }
                 try await Task.sleep(for: .milliseconds(250))
@@ -174,7 +180,7 @@ final class MCPServer: @unchecked Sendable {
             guard (0...25).contains(timeout) else { throw BridgeError("INVALID_ARGUMENT", "timeout_seconds must be between 0 and 25.") }
             let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
             while true {
-                try Task.checkCancellation()
+                try checkConnection()
                 let feedback = try registry.feedback(args)
                 if !feedback["events"].array.isEmpty || ContinuousClock.now >= deadline { return feedback }
                 try await Task.sleep(for: .milliseconds(250))
@@ -195,12 +201,41 @@ final class MCPServer: @unchecked Sendable {
 @main enum ParchmentMCP {
     static func main() async {
         do {
+            if CommandLine.arguments.dropFirst().elementsEqual(["--bridge"]) {
+                let server = try MCPServer()
+                let requests = AsyncStream<String> { continuation in
+                    DispatchQueue.global().async {
+                        while let line = readLine(strippingNewline: true) { continuation.yield(line) }
+                        server.stop(); continuation.finish()
+                    }
+                }
+                for await line in requests {
+                    let response: JSON
+                    do {
+                        let request = try JSON.parse(Data(line.utf8))
+                        let tool = try request.require("tool")
+                        let result = try await server.call(.object(["name": .string(tool), "arguments": request["arguments"]]))
+                        response = .object(["exit_code": .integer(0), "result": result, "stderr": .string("")])
+                    } catch {
+                        response = .object(["exit_code": .integer(1), "result": .object(["error": BridgeError.wrap(error).json]), "stderr": .string("")])
+                    }
+                    FileHandle.standardOutput.write(Data((response.text() + "\n").utf8))
+                }
+                return
+            }
             if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--call" {
                 do {
                     let input = FileHandle.standardInput.readDataToEndOfFile()
                     let arguments = input.isEmpty ? JSON.object([:]) : try JSON.parse(input)
                     let server = try MCPServer()
-                    let result = try await server.call(.object(["name": .string(CommandLine.arguments[2]), "arguments": arguments]))
+                    var result = try await server.call(.object(["name": .string(CommandLine.arguments[2]), "arguments": arguments]))
+                    if case .object(var fields) = result,
+                       CommandLine.arguments[2] == "create_session" || arguments["session_token"].string != nil {
+                        fields["connection"] = .object([
+                            "persistent": .bool(false),
+                            "instructions": .string("This --call helper exits after this response, so it cannot keep an idle session listed. Use ParchmentMCP --bridge instead: keep stdin open and send one JSON line per request with tool and arguments fields. Resume this same token through the bridge. The connection automatically sends keep-alives every 10 seconds, including while idle. Close stdin when the conversation is no longer available.")])
+                        result = .object(fields)
+                    }
                     FileHandle.standardOutput.write(Data((result.text() + "\n").utf8))
                 } catch {
                     let result: JSON = .object(["error": BridgeError.wrap(error).json])
@@ -212,7 +247,7 @@ final class MCPServer: @unchecked Sendable {
                 let dispatcher = SessionEventDispatcher(registry: try IntegrationRegistry())
                 await dispatcher.run(); return
             }
-            guard CommandLine.arguments.count == 1 else { throw BridgeError("INVALID_ARGUMENT", "Usage: ParchmentMCP [--dispatch-events | --dispatch-feedback | --call TOOL < arguments.json]") }
+            guard CommandLine.arguments.count == 1 else { throw BridgeError("INVALID_ARGUMENT", "Usage: ParchmentMCP [--bridge | --dispatch-events | --dispatch-feedback | --call TOOL < arguments.json]") }
             let server = try MCPServer()
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 DispatchQueue.global().async {

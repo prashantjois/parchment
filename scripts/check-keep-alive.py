@@ -15,6 +15,25 @@ import time
 MCP = runpy.run_path(str(Path(__file__).with_name("check-integration.py")))["MCP"]
 
 
+class Bridge:
+    def __init__(self, executable, env):
+        self.process = subprocess.Popen([str(executable), "--bridge"], env=env, stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+
+    def tool(self, name, arguments):
+        self.process.stdin.write(json.dumps({"tool": name, "arguments": arguments}) + "\n")
+        self.process.stdin.flush()
+        response = json.loads(self.process.stdout.readline())
+        assert response["exit_code"] == 0, response
+        return response["result"]
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.stdin.close()
+            self.process.wait(timeout=3)
+        assert self.process.returncode == 0, self.process.stderr.read()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", type=Path, default=Path(".build/debug/Parchment"))
@@ -72,6 +91,10 @@ def main():
                 auth = dict(session_token=session["session_token"])
                 inactive = one_shot("create_session", dict(client="Checks", conversation_label="One shot", wake_up={"mode": "manual"}))
                 inactive_auth = dict(session_token=inactive["session_token"])
+                bridge = Bridge(executable, env)
+                clients.append(bridge)
+                bridged = bridge.tool("create_session", dict(client="Checks", conversation_label="Idle fallback", wake_up={"mode": "manual"}))
+                bridge_auth = dict(session_token=bridged["session_token"])
                 app = subprocess.Popen([str(options.app.resolve()), "--integration-test-server", str(state)],
                                        env=env, stdout=log, stderr=log)
                 def ready():
@@ -92,11 +115,13 @@ def main():
                 listed = observer.tool("list_sessions")["sessions"]
                 live = next(item for item in listed if item["session_id"] == session["session_id"])
                 assert live["last_keep_alive"] - started >= 9
+                assert any(item["session_id"] == bridged["session_id"] for item in listed)
                 assert all(item["session_id"] != inactive["session_id"] for item in listed)
                 assert "session_token" not in json.dumps(listed) and "token_hash" not in json.dumps(listed)
-                print("PASS idle MCP connections send keep-alives every 10 seconds; one-shot sessions expire", flush=True)
+                print("PASS idle MCP and fallback bridge connections keep sending heartbeats; one-shot sessions expire", flush=True)
                 owner.close()
-                until(lambda: all(item["session_id"] != session["session_id"] for item in observer.tool("list_sessions")["sessions"]))
+                bridge.close()
+                until(lambda: all(item["session_id"] not in (session["session_id"], bridged["session_id"]) for item in observer.tool("list_sessions")["sessions"]))
                 local("test_comment", **ref, quote="paragraph", body="Feedback while offline", pending=False)
                 assert observer.tool("get_document", ref)["attachment"]["session_id"] == session["session_id"]
                 resumed = observer.tool("resume_session", auth)
@@ -105,19 +130,31 @@ def main():
                 feedback = observer.tool("get_feedback", binding)
                 assert "Feedback while offline" in json.dumps(feedback["events"])
                 print("PASS disconnect hides the session; reconnect restores the same ownership and queued feedback", flush=True)
-                # Inspecting credentials and metadata must not renew a missing heartbeat.
-                observer.tool("get_receiver_status", inactive_auth)
+                # Viewing the list never revives a disconnected session.
                 assert all(item["session_id"] != inactive["session_id"] for item in observer.tool("list_sessions")["sessions"])
                 local("test_request_attachment", **ref, session_id=inactive["session_id"], error="SESSION_NOT_FOUND")
+                # Authenticated requests renew presence even without an explicit resume.
+                one_shot("get_receiver_status", inactive_auth)
+                assert any(item["session_id"] == inactive["session_id"] for item in observer.tool("list_sessions")["sessions"])
                 heartbeat = one_shot("keep_alive", inactive_auth)
                 assert heartbeat["keep_alive_interval_seconds"] == 10
                 assert heartbeat["expires_at"] - heartbeat["last_keep_alive"] == 11
                 assert any(item["session_id"] == inactive["session_id"] for item in observer.tool("list_sessions")["sessions"])
                 with sqlite3.connect(state / "integration.sqlite") as database:
                     database.execute("UPDATE sessions SET last_keep_alive=? WHERE id=?", (time.time() - 12, inactive["session_id"]))
-                observer.tool("get_receiver_status", inactive_auth)
                 assert all(item["session_id"] != inactive["session_id"] for item in observer.tool("list_sessions")["sessions"])
-                print("PASS explicit keep-alives restore presence; unrelated authenticated reads do not", flush=True)
+                print("PASS authenticated requests renew presence; viewing the list does not revive expired sessions", flush=True)
+                reconnected = Bridge(executable, env)
+                clients.append(reconnected)
+                reconnected.tool("get_receiver_status", bridge_auth)
+                assert reconnected.tool("wait_for_events", dict(bridge_auth, timeout_seconds=12))["events"] == []
+                assert any(item["session_id"] == bridged["session_id"] for item in observer.tool("list_sessions")["sessions"])
+                print("PASS fallback reconnection restores automatic heartbeats through any authenticated tool, including long waits", flush=True)
+                reconnected.process.stdin.write(json.dumps({"tool": "wait_for_events", "arguments": dict(bridge_auth, timeout_seconds=25)}) + "\n")
+                reconnected.process.stdin.flush()
+                time.sleep(.2)
+                reconnected.close()
+                print("PASS closing the fallback connection cancels an outstanding wait promptly", flush=True)
             except Exception:
                 log.flush(); log.seek(0); print(log.read())
                 raise

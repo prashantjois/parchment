@@ -155,7 +155,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
             var result = try session(token).object
             result["session_token"] = .string(token)
             result["delivery"] = try receiverStatus(sessionID: .string(id))
-            result["instructions"] = .string("Keep this token in the original conversation. Resume it and synchronize its name and model. The connected MCP helper sends keep-alives every 10 seconds after create_session or resume_session. With --call, send keep_alive every 10 seconds yourself. Inactive sessions disappear from list_sessions after 11 seconds, including one second of scheduling tolerance. Ownership and feedback survive inactivity. Use get_events each turn to read your session inbox. Wake-up configuration is part of registration; update_session can change it without replacing this identity.")
+            result["instructions"] = .string("Keep this token in the original conversation. Resume it and synchronize its name and model. A persistent MCP connection sends keep-alives every 10 seconds, including while idle, after any authenticated tool call. Without configured MCP tools, run ParchmentMCP --bridge and keep its stdin open; send one JSON object per line with tool and arguments fields. Do not wrap --call in a loop that starts a fresh helper for each request: its timer ends when the request returns. Sessions disappear after 11 seconds without a keep-alive, including one second of scheduling tolerance. Ownership and feedback survive inactivity. Use get_events each turn to read your session inbox. Wake-up configuration is part of registration; update_session can change it without replacing this identity.")
             return .object(result)
         }
     }
