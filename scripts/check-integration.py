@@ -148,7 +148,7 @@ def main():
             assert legacy["session_id"] == "legacy-session" and legacy["model"] is None
             passed("version-one registry migrates without losing session identity")
             tools = a.request("tools/list")["tools"]
-            assert len(tools) == 23 and len({tool["name"] for tool in tools}) == 23
+            assert len(tools) == 24 and len({tool["name"] for tool in tools}) == 24
             a.tool("list_documents", error="APP_UNAVAILABLE")
             a.tool("create_session", {"wake_up": {"mode": "manual"}, "client": 42, "conversation_label": "bad"}, error="INVALID_ARGUMENT")
             passed("MCP initialization, schemas, and unavailable-app error")

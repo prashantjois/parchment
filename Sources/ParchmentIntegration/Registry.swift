@@ -6,6 +6,9 @@ import ParchmentCore
 /// SQLite serializes ownership changes across MCP processes. The app alone
 /// performs document mutations; credentials are never returned by list tools.
 public final class IntegrationRegistry: @unchecked Sendable {
+    public static let keepAliveInterval: TimeInterval = 10
+    // Allow one second of scheduling jitter around the ten-second cadence.
+    public static let keepAliveTimeout: TimeInterval = 11
     private var db: OpaquePointer?
     private let lock = NSRecursiveLock()
     public let directory: URL
@@ -39,6 +42,9 @@ public final class IntegrationRegistry: @unchecked Sendable {
             if !(try rows("PRAGMA table_info(sessions)")).contains(where: { $0["name"]?.string == "wake_up_mode" }) {
                 try execute("ALTER TABLE sessions ADD COLUMN wake_up_mode TEXT NOT NULL DEFAULT 'unspecified'")
                 try execute("UPDATE sessions SET wake_up_mode='command' WHERE id IN (SELECT session_id FROM receivers)")
+            }
+            if !(try rows("PRAGMA table_info(sessions)")).contains(where: { $0["name"]?.string == "last_keep_alive" }) {
+                try execute("ALTER TABLE sessions ADD COLUMN last_keep_alive REAL")
             }
             try createEventBus(migrating: version < 3)
             try execute("PRAGMA user_version=3")
@@ -144,19 +150,28 @@ public final class IntegrationRegistry: @unchecked Sendable {
         try validateWakeUpConfiguration(wakeUp)
         return try transaction {
             let id = UUID().uuidString, token = UUID().uuidString + UUID().uuidString
-            try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen,model) VALUES(?,?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now, model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null])
+            try execute("INSERT INTO sessions(id,token_hash,client,label,conversation_id,last_seen,model,last_keep_alive) VALUES(?,?,?,?,?,?,?,?)", [.string(id), .string(sourceHash(token)), .string(client), .string(label), conversationID.map(JSON.string) ?? .null, now, model.flatMap { $0.isEmpty ? nil : JSON.string($0) } ?? .null, now])
             try configureWakeUp(sessionID: .string(id), configuration: wakeUp)
             var result = try session(token).object
             result["session_token"] = .string(token)
             result["delivery"] = try receiverStatus(sessionID: .string(id))
-            result["instructions"] = .string("Keep this token in the original conversation. Resume it and synchronize its name and model. Use get_events each turn to read your session inbox. Wake-up configuration is part of registration; update_session can change it without replacing this identity.")
+            result["instructions"] = .string("Keep this token in the original conversation. Resume it and synchronize its name and model. The connected MCP helper sends keep-alives every 10 seconds after create_session or resume_session. With --call, send keep_alive every 10 seconds yourself. Inactive sessions disappear from list_sessions after 11 seconds, including one second of scheduling tolerance. Ownership and feedback survive inactivity. Use get_events each turn to read your session inbox. Wake-up configuration is part of registration; update_session can change it without replacing this identity.")
             return .object(result)
         }
     }
     public func session(_ token: String) throws -> JSON {
-        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id,model,last_seen,wake_up_mode FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
+        guard let row = try rows("SELECT id AS session_id,client,label AS conversation_label,conversation_id,model,last_seen,last_keep_alive,wake_up_mode FROM sessions WHERE token_hash=?", [.string(sourceHash(token))]).first else { throw BridgeError("INVALID_SESSION", "The session token is invalid. Create a session or reuse the token from the original conversation.") }
         try execute("UPDATE sessions SET last_seen=? WHERE id=? AND last_seen<?", [now, row["session_id"]!, .number(Date().timeIntervalSince1970 - 5)])
         return sessionMetadata(row)
+    }
+    public func keepAlive(_ token: String) throws -> JSON {
+        try transaction {
+            let current = try session(token), timestamp = Date().timeIntervalSince1970
+            try execute("UPDATE sessions SET last_keep_alive=?,last_seen=? WHERE id=?", [.number(timestamp), .number(timestamp), current["session_id"]])
+            return .object(["session_id": current["session_id"], "last_keep_alive": .number(timestamp),
+                            "keep_alive_interval_seconds": .number(Self.keepAliveInterval),
+                            "expires_at": .number(timestamp + Self.keepAliveTimeout)])
+        }
     }
     public func updateSession(_ args: JSON) throws -> JSON {
         try transaction {
@@ -172,7 +187,7 @@ public final class IntegrationRegistry: @unchecked Sendable {
         }
     }
     public func registeredSessions() throws -> JSON {
-        let values = try rows("SELECT s.id AS session_id,s.client,s.label AS conversation_label,s.conversation_id,s.model,s.last_seen,s.wake_up_mode, r.receiver_id IS NOT NULL AS receiver_registered FROM sessions s LEFT JOIN receivers r ON r.session_id=s.id ORDER BY s.label COLLATE NOCASE,s.id")
+        let values = try rows("SELECT s.id AS session_id,s.client,s.label AS conversation_label,s.conversation_id,s.model,s.last_seen,s.last_keep_alive,s.wake_up_mode, r.receiver_id IS NOT NULL AS receiver_registered FROM sessions s LEFT JOIN receivers r ON r.session_id=s.id WHERE s.last_keep_alive>? ORDER BY s.label COLLATE NOCASE,s.id", [.number(Date().timeIntervalSince1970 - Self.keepAliveTimeout)])
         return .object(["sessions": .array(try values.map { row in
             var value = sessionMetadata(row).object
             value["documents"] = .array(try rows("SELECT d.id AS document_id,d.title,d.path FROM documents d JOIN bindings b ON b.document_id=d.id WHERE b.session_id=? ORDER BY d.title", [row["session_id"]!]).map(JSON.object))

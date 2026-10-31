@@ -2,6 +2,48 @@ import Foundation
 import ParchmentCore
 
 final class CoreTests {
+    func testLiteralSearchCanIgnoreDiacriticsWithoutLosingSourceRanges() {
+        let text = "🌎 CAFÉ\r\nCafe\u{301}\ncafe"
+        let results = DocumentSearch.find("cafe", in: text, ignoreDiacritics: true)
+        expectEqual(results.map(\.range), [NSRange(location: 3, length: 4), NSRange(location: 9, length: 5), NSRange(location: 15, length: 4)])
+        expectEqual(results.map(\.line), [1, 2, 3])
+        expectEqual(DocumentSearch.find("cafe", in: text).count, 1)
+        expectEqual(DocumentSearch.find("cafe", in: text, caseSensitive: true, ignoreDiacritics: true).count, 1)
+    }
+    func testRegexSearchSupportsLineAnchorsAndZeroWidthMatches() throws {
+        let text = "# 🌎\r\nitem-12\r\nitem-7\nother"
+        let results = try SearchPattern(#"^item-\d+$"#).find(in: text)
+        expectEqual(results.map { (text as NSString).substring(with: $0.range) }, ["item-12", "item-7"])
+        expectEqual(results.map(\.line), [2, 3])
+        expectEqual(try SearchPattern("^").find(in: "one\ntwo").map(\.range), [NSRange(location: 0, length: 0), NSRange(location: 4, length: 0)])
+        expectEqual(try SearchPattern("^").find(in: "").count, 1)
+    }
+    func testRegexSearchCombinesCaseAndDiacriticOptions() throws {
+        let text = "🌎 CAFÉ\r\nCafe\u{301}\ncafe"
+        let results = try SearchPattern(#"\bcaf[eé]\b"#, ignoreDiacritics: true).find(in: text)
+        expectEqual(results.map(\.range), [NSRange(location: 3, length: 4), NSRange(location: 9, length: 5), NSRange(location: 15, length: 4)])
+        expectEqual(try SearchPattern("cafe", caseSensitive: true, ignoreDiacritics: true).find(in: text).count, 1)
+        expectEqual(try SearchPattern("café", ignoreDiacritics: true).find(in: text).count, 3)
+        expectEqual(try SearchPattern("cafe").find(in: text).count, 2)
+        expectThrows(try SearchPattern("("))
+    }
+    func testSearchPreservesUnicodeOffsetsAndLineNumbers() {
+        let text = "🌎 Hit\r\nhit\rHit\n"
+        let results = DocumentSearch.find("hit", in: text)
+        expectEqual(results.map(\.range), [NSRange(location: 3, length: 3), NSRange(location: 8, length: 3), NSRange(location: 12, length: 3)])
+        expectEqual(results.map(\.line), [1, 2, 3])
+        expectEqual(DocumentSearch.find("Hit", in: text, caseSensitive: true).count, 2)
+        expectEqual(DocumentSearch.find("Hit\r\nhit", in: text).first?.range, NSRange(location: 3, length: 8))
+    }
+    func testSearchIsLiteralAndKeepsTheMatchInLongLinePreviews() {
+        expectTrue(DocumentSearch.find("", in: "Some text").isEmpty)
+        expectEqual(DocumentSearch.find("[a].*", in: "[a].* and [A].*").count, 2)
+        expectEqual(DocumentSearch.find("[a].*", in: "[a].* and [A].*", caseSensitive: true).count, 1)
+        let long = String(repeating: "x", count: 250) + " 🌎 needle"
+        let result = DocumentSearch.find("needle", in: long).first!
+        expectTrue(result.preview.contains("needle"))
+        expectEqual((long as NSString).substring(with: result.range), "needle")
+    }
     func testDocumentLinksRoundTripSpecialPaths() throws {
         let file = URL(fileURLWithPath: "/tmp/Café 🪴 + & # % ? (draft).md")
         let url = try DocumentLink.url(for: file, line: 42)
@@ -301,6 +343,19 @@ final class CoreTests {
         expectTrue(html.contains("data-language=\"swift\"")); expectTrue(html.contains("&lt;script&gt;"))
         expectTrue(html.contains("href=\"https://example.com\""))
     }
+    func testMermaidBlocksPreserveEscapedSourceAndOffsets() {
+        let source = "# Café 🌎\r\n\r\n```mermaid\r\nflowchart LR\r\n  A[\"<script>alert(1)</script> & café\"] --> B\r\n```\r\n"
+        let html = MarkdownRenderer.render(source).html
+        expectTrue(html.contains("class=\"diagram mermaid-diagram\""))
+        expectTrue(html.contains("data-start=\"\((source as NSString).range(of: "```mermaid").location)\""))
+        expectTrue(html.contains("data-language=\"mermaid\""))
+        expectTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt; &amp; café"))
+        expectTrue(html.contains("data-leaf=\"true\""))
+        expectFalse(html.contains("<script>"))
+        expectTrue(MarkdownRenderer.render("```MERMAID\nsequenceDiagram\n A->>B: Hello\n```").html.contains("mermaid-diagram"))
+        expectFalse(MarkdownRenderer.render("```swift\nlet mermaid = 1\n```").html.contains("mermaid-diagram"))
+        expectFalse(MarkdownRenderer.render("    flowchart LR\n      A --> B\n").html.contains("mermaid-diagram"))
+    }
     func testRendererDoesNotExecuteRawHTMLOrUnsafeLinks() {
         let html = MarkdownRenderer.render("<script>alert(1)</script>\n\n[x](javascript:alert)\n\n![remote](https://example.com/tracker.png)").html
         expectFalse(html.contains("<script>")); expectFalse(html.contains("href=\"javascript:"))
@@ -455,6 +510,11 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
     static func main() {
         let suite = CoreTests()
         let tests: [(String, () throws -> Void)] = [
+            ("testLiteralSearchCanIgnoreDiacriticsWithoutLosingSourceRanges", suite.testLiteralSearchCanIgnoreDiacriticsWithoutLosingSourceRanges),
+            ("testRegexSearchSupportsLineAnchorsAndZeroWidthMatches", suite.testRegexSearchSupportsLineAnchorsAndZeroWidthMatches),
+            ("testRegexSearchCombinesCaseAndDiacriticOptions", suite.testRegexSearchCombinesCaseAndDiacriticOptions),
+            ("testSearchPreservesUnicodeOffsetsAndLineNumbers", suite.testSearchPreservesUnicodeOffsetsAndLineNumbers),
+            ("testSearchIsLiteralAndKeepsTheMatchInLongLinePreviews", suite.testSearchIsLiteralAndKeepsTheMatchInLongLinePreviews),
             ("testDocumentLinksRoundTripSpecialPaths", suite.testDocumentLinksRoundTripSpecialPaths),
             ("testDocumentLinksRejectInvalidRequests", suite.testDocumentLinksRejectInvalidRequests),
             ("testDirectDocumentLinks", suite.testDirectDocumentLinks),
@@ -477,6 +537,7 @@ private func expectThrows<T>(_ value: @autoclosure () throws -> T, file: StaticS
             ("testToolbarViewButtonWorksFromEveryMode", suite.testToolbarViewButtonWorksFromEveryMode),
             ("testRendererIncludesSixHeadingLevelsAndSourceMapping", suite.testRendererIncludesSixHeadingLevelsAndSourceMapping),
             ("testRendererHandlesTablesTasksLinksAndCode", suite.testRendererHandlesTablesTasksLinksAndCode),
+            ("testMermaidBlocksPreserveEscapedSourceAndOffsets", suite.testMermaidBlocksPreserveEscapedSourceAndOffsets),
             ("testFrontMatterIsHiddenWithOriginalSourceOffsets", suite.testFrontMatterIsHiddenWithOriginalSourceOffsets),
             ("testFrontMatterDetectionPreservesOrdinaryMarkdown", suite.testFrontMatterDetectionPreservesOrdinaryMarkdown),
             ("testRendererDoesNotExecuteRawHTMLOrUnsafeLinks", suite.testRendererDoesNotExecuteRawHTMLOrUnsafeLinks),

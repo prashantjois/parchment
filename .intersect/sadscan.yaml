@@ -1,0 +1,11 @@
+# Verified false positives in the unmodified Mermaid 11.17.2 browser bundle.
+# The source URL and SHA-256 are recorded in vendor/mermaid/PROVENANCE.txt.
+exclude_rules_for_files:
+  # SVG square-root path coordinates, not a social insurance number.
+  "sq.pii.sin.ca":
+    - "vendor/mermaid/mermaid.min.js"
+    - "**/vendor/mermaid/mermaid.min.js"
+  # A diagram layout function name, not an access key.
+  "kingfisher.alibabacloud.1":
+    - "vendor/mermaid/mermaid.min.js"
+    - "**/vendor/mermaid/mermaid.min.js"

@@ -5,8 +5,8 @@ extension IntegrationRegistry {
     public func requestAttachment(documentID: String, sessionID: String, transfer: Bool = false, expectedOwner: JSON? = nil) throws -> JSON {
         try transaction {
             _ = try document(documentID)
-            guard !(try rows("SELECT id FROM sessions WHERE id=?", [.string(sessionID)])).isEmpty else {
-                throw BridgeError("SESSION_NOT_FOUND", "This session is no longer registered.")
+            guard !(try rows("SELECT id FROM sessions WHERE id=? AND last_keep_alive>?", [.string(sessionID), .number(Date().timeIntervalSince1970 - Self.keepAliveTimeout)])).isEmpty else {
+                throw BridgeError("SESSION_NOT_FOUND", "This session is no longer active. Resume it before requesting an attachment.")
             }
             let owner = try attachment(documentID)
             if let expectedOwner, owner["session_id"] != expectedOwner["session_id"] || owner["generation"] != expectedOwner["generation"] {

@@ -156,6 +156,7 @@ if not path.exists():
         assert "PRIVATE PENDING FEEDBACK" not in json.dumps(delivered)
         print("PASS submitted review notifies the owning agent without an active MCP connection; pending drafts stay private")
         a = client()
+        a.tool("resume_session", {"session_token": first["session_token"]})
         status_args = {"session_token": first["session_token"]}
         until(lambda: a.tool("get_receiver_status", status_args)["accepted_notifications"] == 1)
         a.tool("acknowledge_feedback", dict(auth, cursor=event["cursor"]), error="INVALID_CURSOR")
@@ -283,7 +284,8 @@ if not path.exists():
         request = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
         repeat = local("test_request_attachment", **attach_ref, session_id=second["session_id"])
         assert request["request_id"] == repeat["request_id"]
-        until(lambda: b.tool("get_receiver_status", second_status)["last_error"])
+        # Wait for this request's rejection, not an older feedback delivery error.
+        until(lambda: local("test_request_attachment", **attach_ref, session_id=second["session_id"])["last_error"])
         stop(app); app = None
         mode.write_text("accept")
         worker = start_worker()

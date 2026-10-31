@@ -1,0 +1,9 @@
+Mermaid 11.17.2
+https://github.com/mermaid-js/mermaid/tree/mermaid%4011.17.2
+
+The unmodified classic browser bundle includes all diagram types.
+Source: https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js
+SHA-256: 581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8
+
+The MIT license is in LICENSE. The bundle retains dependency license notices.
+Parchment loads this local file through WKUserScript. No CDN is used at runtime.

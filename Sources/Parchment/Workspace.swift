@@ -23,6 +23,8 @@ enum DocumentSaveError: LocalizedError {
     @Published var commentReadState = CommentReadState()
     @Published var rendered: RenderedDocument
     @Published var selection = NSRange(location: 0, length: 0)
+    @Published var searchRanges: [NSRange] = []
+    @Published var activeSearchRange: NSRange?
     @Published var jump: JumpRequest?
     @Published var selectedThread: UUID?
     @Published var commentDraftAnchor: CommentAnchor?
@@ -256,8 +258,9 @@ struct SessionDocument: Codable {
 struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocument] }
 
 @MainActor final class Workspace: ObservableObject {
-    @Published var documents: [EditorDocument] = []
-    @Published var activeID: UUID? { didSet { navigatedFromTab(oldValue) } }
+    @Published var documents: [EditorDocument] = [] { didSet { search.refresh() } }
+    @Published var activeID: UUID? { didSet { navigatedFromTab(oldValue); search.refresh() } }
+    let search: SearchController
     @Published var backHistory: [NavigationLocation] = []
     @Published var forwardHistory: [NavigationLocation] = []
     var navigationDepth = 0
@@ -273,20 +276,22 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     let recentDocuments: RecentDocuments
     var active: EditorDocument? { documents.first { $0.id == activeID } }
 
-    init(recoveryDirectory: URL? = nil) {
+    init(recoveryDirectory: URL? = nil, searchDefaults: UserDefaults = .standard) {
+        search = SearchController(defaults: searchDefaults)
         support = recoveryDirectory ?? IntegrationPaths.directory
         recentDocuments = RecentDocuments(storageURL: support.appendingPathComponent("recent-documents.json"),
                                           recordsSystemRecents: recoveryDirectory == nil)
         do { try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true) }
         catch { self.error = "Cannot create the recovery folder: \(error.localizedDescription)" }
         restore()
+        search.workspace = self
         recentDocuments.seedFromSession(([active?.url].compactMap { $0 }) + documents.compactMap(\.url))
         if documents.isEmpty { newDocument() }
         recordsNavigation = true
     }
     func attach(_ document: EditorDocument) {
         do { try integration?.register(document) } catch { document.integrationError = error.localizedDescription }
-        document.onChange = { [weak self] in self?.scheduleRecovery() }
+        document.onChange = { [weak self] in self?.search.refresh(); self?.scheduleRecovery() }
         document.onNavigate = { [weak self, weak document] in
             guard let self, let document, self.activeID == document.id else { return }
             self.recordCurrentLocation()

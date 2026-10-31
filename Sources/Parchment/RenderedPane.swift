@@ -71,6 +71,7 @@ struct RenderedPane: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSView {
         let config = WKWebViewConfiguration()
+        MermaidPreview.install(in: config.userContentController)
         config.userContentController.add(context.coordinator, name: "parchment")
         let web = PreviewWebView(frame: .zero, configuration: config)
         web.navigationDelegate = context.coordinator
@@ -119,13 +120,14 @@ struct RenderedPane: NSViewRepresentable {
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; script-src 'nonce-\(nonce)';">
             <meta name="referrer" content="no-referrer">
-            <style>html,body{margin:0;min-height:100%;}.markdown-doc{min-height:100vh;}::highlight(comments){background:#e5b54b55;}::highlight(active-comment){background:#e5b54b99;}</style>
+            <style>html,body{margin:0;min-height:100%;}.markdown-doc{min-height:100vh;}::highlight(comments){background:#e5b54b55;}::highlight(active-comment){background:#e5b54b99;}::highlight(search){background:#ffb34066;}::highlight(active-search){background:#ff9c20bb;}</style>
             </head><body><article class="markdown-doc" data-appearance="\(dark ? "dark" : "light")">\(document.rendered.html)</article>
             <script nonce="\(nonce)">
             const theme = document.createElement('style');
             theme.textContent = new TextDecoder().decode(Uint8Array.from(atob('\(encodedCSS)'), c => c.charCodeAt(0)));
             document.head.appendChild(theme);
             \(Self.script)
+            \(MermaidPreview.script)
             </script></body></html>
             """
             web.loadHTMLString(html, baseURL: document.url?.deletingLastPathComponent())
@@ -140,10 +142,15 @@ struct RenderedPane: NSViewRepresentable {
         var lastJump: UUID?
         var lastScroll = -1.0
         var lastHighlights = ""
+        var lastSearchHighlights = ""
         var lastImagePolicy = ""
         init(_ parent: RenderedPane) { self.parent = parent }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            ready = true; lastScroll = -1; lastHighlights = ""; lastImagePolicy = ""; updateState()
+            // Restore scroll and comment state after asynchronous diagrams settle.
+            webView.evaluateJavaScript("void renderMermaidDiagrams().finally(() => send({type:'diagrams-ready'}))", completionHandler: nil)
+        }
+        func previewReady() {
+            ready = true; lastScroll = -1; lastHighlights = ""; lastSearchHighlights = ""; lastImagePolicy = ""; updateState()
             web?.updateHorizontalScrolling(force: true)
         }
         func updateState() {
@@ -160,11 +167,21 @@ struct RenderedPane: NSViewRepresentable {
             }
             let json = String(data: try! JSONSerialization.data(withJSONObject: ranges), encoding: .utf8)!
             if json != lastHighlights { lastHighlights = json; web.evaluateJavaScript("setComments(\(json))", completionHandler: nil) }
-            if let jump = doc.jump, lastJump != jump.id {
+            let searchRanges: [[String: Any]] = sourceHash(doc.text) == loadedSourceHash ? doc.searchRanges.map {
+                ["start": $0.location, "end": NSMaxRange($0), "active": $0 == doc.activeSearchRange]
+            } : []
+            let searchJSON = String(data: try! JSONSerialization.data(withJSONObject: searchRanges), encoding: .utf8)!
+            if searchJSON != lastSearchHighlights {
+                lastSearchHighlights = searchJSON
+                web.evaluateJavaScript("setSearchHighlights(\(searchJSON))", completionHandler: nil)
+            }
+            if let jump = doc.jump, lastJump != jump.id, sourceHash(doc.text) == loadedSourceHash {
                 lastJump = jump.id
                 if jump.restoreScroll {
                     lastScroll = doc.layout.renderedScroll
                     web.evaluateJavaScript("setScroll(\(lastScroll))", completionHandler: nil)
+                } else if jump.range == doc.activeSearchRange {
+                    web.evaluateJavaScript("jumpToSearch(\(jump.range.location))", completionHandler: nil)
                 } else { web.evaluateJavaScript("jumpToSource(\(jump.range.location))", completionHandler: nil) }
             } else if abs(lastScroll - doc.layout.renderedScroll) > 0.005 {
                 lastScroll = doc.layout.renderedScroll
@@ -174,7 +191,9 @@ struct RenderedPane: NSViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let value = message.body as? [String: Any], let type = value["type"] as? String else { return }
             let doc = parent.document
-            if ["selection", "comment"].contains(type), let start = value["start"] as? Int, let end = value["end"] as? Int {
+            if type == "diagrams-ready" {
+                previewReady()
+            } else if ["selection", "comment"].contains(type), let start = value["start"] as? Int, let end = value["end"] as? Int {
                 guard sourceHash(doc.text) == loadedSourceHash else { return }
                 let range = TextSpan(location: start, length: end - start)
                 guard range.isValid(in: doc.text) else { return }
@@ -347,6 +366,35 @@ struct RenderedPane: NSViewRepresentable {
       }
       CSS.highlights.set('comments', new Highlight(...all));
       CSS.highlights.set('active-comment', new Highlight(...active));
+    }
+    function setSearchHighlights(matches) {
+      if (!CSS.highlights || !window.Highlight) return;
+      const all = [], active = [];
+      const elements = leaves().sort((a, b) => +a.dataset.start - +b.dataset.start);
+      let next = 0;
+      for (const element of elements) {
+        const start = +element.dataset.start, end = +element.dataset.end;
+        while (next < matches.length && matches[next].end <= start) next++;
+        for (let index = next; index < matches.length && matches[index].start < end; index++) {
+          const match = matches[index];
+          const range = document.createRange(); range.selectNodeContents(element);
+          if (element.dataset.precise === '1' && element.firstChild?.nodeType === 3) {
+            range.setStart(element.firstChild, Math.max(0, match.start - start));
+            range.setEnd(element.firstChild, Math.min(element.textContent.length, match.end - start));
+          }
+          all.push(range); if (match.active) active.push(range);
+        }
+      }
+      CSS.highlights.set('search', new Highlight(...all));
+      CSS.highlights.set('active-search', new Highlight(...active));
+    }
+    function jumpToSearch(offset) {
+      const ranges = CSS.highlights?.get('active-search');
+      if (ranges) for (const range of ranges) {
+        const rect = range.getBoundingClientRect();
+        if (rect.height > 0) { scrollBy(0, rect.top - innerHeight / 2); return; }
+      }
+      jumpToSource(offset);
     }
     document.addEventListener('click', event => {
       const link = event.target.closest('a');

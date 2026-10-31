@@ -46,12 +46,17 @@ actor AppLauncher {
 
 final class MCPServer: @unchecked Sendable {
     let registry: IntegrationRegistry
+    private let keepAlives: SessionKeepAlives
     let client = LocalAPIClient()
     let launcher = AppLauncher()
     private let lock = NSLock()
     private var tasks: [String: Task<Void, Never>] = [:]
     private var initialized = false
-    init() throws { registry = try IntegrationRegistry() }
+    init() throws {
+        let registry = try IntegrationRegistry()
+        self.registry = registry
+        keepAlives = SessionKeepAlives(registry: registry)
+    }
     private func send(_ value: JSON) {
         lock.lock(); defer { lock.unlock() }
         FileHandle.standardOutput.write(Data((value.text() + "\n").utf8))
@@ -77,7 +82,7 @@ final class MCPServer: @unchecked Sendable {
             send(.object(["jsonrpc": .string("2.0"), "id": id, "result": .object([
                 "protocolVersion": .string(version), "capabilities": .object(["tools": .object([:])]),
                 "serverInfo": .object(["name": .string("parchment"), "version": .string("1.3.0")]),
-                "instructions": .string("Use one session per agent conversation. Register its current name, optional model, and wake_up configuration together in create_session. Use command mode with a documented queue command, or explicit manual mode. Keep the token. Resume and synchronize metadata each turn; update_session can repair wake-up configuration without creating another identity. Read get_events at the start of each turn and on every notification. wait_for_events covers all documents, including new attachment requests. Accept requests with attach_document and attachment_request_id. For feedback events use the event's binding_id and generation with get_feedback; stale notifications must not reclaim detached files. Read the latest document before edits. Acknowledge only handled document feedback and bus events. A wake-up only queues input, never acknowledges work. Pending reviews stay private. Only one session owns a document; transfer requires explicit user approval.")
+                "instructions": .string("Use one session per agent conversation. Register its current name, optional model, and wake_up configuration together in create_session. Use command mode with a documented queue command, or explicit manual mode. Keep the token. The connected helper sends keep-alives every 10 seconds after create_session or resume_session. Sessions disappear from the session list after 11 seconds without a keep-alive, including one second of scheduling tolerance. Ownership and pending feedback survive inactivity. Resume and synchronize metadata each turn; update_session can repair wake-up configuration without creating another identity. Read get_events at the start of each turn and on every notification. wait_for_events covers all documents, including new attachment requests. Accept requests with attach_document and attachment_request_id. For feedback events use the event's binding_id and generation with get_feedback; stale notifications must not reclaim detached files. Read the latest document before edits. Acknowledge only handled document feedback and bus events. A wake-up only queues input, never acknowledges work. Pending reviews stay private. Only one session owns a document; transfer requires explicit user approval.")
             ])])); return
         }
         guard initialized || method == "ping" else { rpcError(id, -32002, "Initialize the server first"); return }
@@ -101,7 +106,10 @@ final class MCPServer: @unchecked Sendable {
         lock.unlock()
     }
     private func finish(_ key: String) { lock.lock(); tasks.removeValue(forKey: key); lock.unlock() }
-    func stop() { lock.lock(); tasks.values.forEach { $0.cancel() }; lock.unlock() }
+    func stop() {
+        keepAlives.stop()
+        lock.lock(); tasks.values.forEach { $0.cancel() }; lock.unlock()
+    }
     func call(_ params: JSON) async throws -> JSON {
         let name = try params.require("name"), args = params["arguments"] == .null ? JSON.object([:]) : params["arguments"]
         try ToolCatalog.validate(name, args)
@@ -119,9 +127,15 @@ final class MCPServer: @unchecked Sendable {
                 }
             }
             if name == "update_session" { return try registry.updateSession(args) }
-            return try registry.createSession(client: args.require("client"), label: args.require("conversation_label"), conversationID: args["conversation_id"].string, model: args["model"].string, wakeUp: args["wake_up"])
+            let session = try registry.createSession(client: args.require("client"), label: args.require("conversation_label"), conversationID: args["conversation_id"].string, model: args["model"].string, wakeUp: args["wake_up"])
+            try keepAlives.track(session.require("session_token"))
+            return session
         case "list_sessions": return try registry.registeredSessions()
-        case "resume_session": return try registry.session(args.require("session_token"))
+        case "resume_session":
+            let token = try args.require("session_token")
+            try keepAlives.track(token)
+            return try registry.session(token)
+        case "keep_alive": return try keepAlives.track(args.require("session_token"))
         case "register_receiver":
             _ = try registry.session(args.require("session_token"))
             try await launcher.ensureRunning(client: client)

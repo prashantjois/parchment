@@ -175,7 +175,10 @@ struct SourcePane: NSViewRepresentable {
             if selected.location <= length && selected.length <= length - selected.location && selected.length > 0 { text.setSelectedRange(selected) }
             else { text.setSelectedRange(NSRange(location: min(document.layout.cursorLocation, length), length: 0)) }
             coordinator.restoreScroll()
-            if let window = text.window, window.attachedSheet == nil { window.makeFirstResponder(text) }
+            if let window = text.window, window.attachedSheet == nil {
+                if let field = window.firstResponder as? NSTextView, field.isFieldEditor { return }
+                window.makeFirstResponder(text)
+            }
         }
         return scroll
     }
@@ -235,6 +238,11 @@ struct SourcePane: NSViewRepresentable {
                 if let range = thread.locate(in: document.text).range {
                     text.layoutManager?.addTemporaryAttribute(.backgroundColor, value: NSColor.systemYellow.withAlphaComponent(thread.id == document.selectedThread ? 0.4 : 0.18), forCharacterRange: range.nsRange)
                 }
+            }
+            for range in document.searchRanges where NSMaxRange(range) <= (text.string as NSString).length {
+                text.layoutManager?.addTemporaryAttribute(.backgroundColor,
+                    value: NSColor.systemOrange.withAlphaComponent(range == document.activeSearchRange ? 0.65 : 0.25),
+                    forCharacterRange: range)
             }
         }
 

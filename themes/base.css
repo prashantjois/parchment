@@ -102,6 +102,9 @@
   .markdown-doc img { max-width: 100%; height: auto; vertical-align: middle; }
   .markdown-doc .remote-image:not(:has(img)) { color: var(--pt-muted); border: 1px dashed var(--pt-border); padding: 0.25em 0.5em; border-radius: 4px; cursor: context-menu; }
   .markdown-doc figure { margin-inline: 0; }
+  .markdown-doc .mermaid-output { overflow-x: auto; padding: 1em; text-align: center; }
+  .markdown-doc .mermaid-output svg { display: inline-block; max-width: 100%; height: auto; vertical-align: middle; }
+  .markdown-doc .mermaid-error { white-space: pre-wrap; text-align: left; }
   .markdown-doc figcaption { margin-top: 0.5em; color: var(--pt-muted); font-size: 0.875em; text-align: center; }
   .markdown-doc :is(ul, ol) { padding-inline-start: 1.75em; }
   .markdown-doc li { margin-block: 0.2em; }

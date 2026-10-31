@@ -95,7 +95,7 @@ struct DocumentTab: View {
             .contextMenu {
                 Button("Add File Comment", action: comment)
                 Menu("Sessions") {
-                    if document.integrationSessions.isEmpty { Text("No registered sessions") }
+                    if document.integrationSessions.isEmpty { Text("No active sessions") }
                     ForEach(document.integrationSessions.indices, id: \.self) { index in
                         let session = document.integrationSessions[index]
                         let attached = document.integrationAttachment["session_id"] == session["session_id"]

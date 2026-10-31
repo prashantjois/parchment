@@ -139,6 +139,9 @@ public enum MarkdownRenderer {
             case let text as Markdown.Text: return leaf(node, text: text.string)
             case let code as InlineCode: return leaf(node, text: code.code, tag: "code")
             case let code as CodeBlock:
+                if code.language?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "mermaid" {
+                    return "<figure class=\"diagram mermaid-diagram\"\(a)><pre><code data-language=\"mermaid\">\(leaf(code, text: code.code))</code></pre></figure>"
+                }
                 return "<pre\(a)><code data-language=\"\(escape(code.language ?? ""))\">\(highlightedCode(code))</code></pre>"
             case is Paragraph: return "<p\(a)>\(children(node))</p>"
             case is Strong: return "<strong\(a)>\(children(node))</strong>"

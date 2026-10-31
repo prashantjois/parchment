@@ -13,7 +13,7 @@ let package = Package(
         .executableTarget(name: "ParchmentMCP", dependencies: ["ParchmentIntegration"]),
         .executableTarget(name: "Parchment", dependencies: ["ParchmentCore", "ParchmentIntegration"], path: ".",
             exclude: ["docs", "skills", "Tests", "Sources/ParchmentCore", "Sources/CSQLite", "Sources/ParchmentIntegration", "Sources/ParchmentMCP", "scripts", "README.md", "examples", "dist"],
-            sources: ["Sources/Parchment"], resources: [.copy("themes")]),
+            sources: ["Sources/Parchment"], resources: [.copy("themes"), .copy("vendor")]),
         .executableTarget(name: "ParchmentChecks", dependencies: ["ParchmentCore"], path: "Tests/ParchmentCoreTests")
     ]
 )

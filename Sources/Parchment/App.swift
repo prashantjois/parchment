@@ -13,6 +13,8 @@ import ParchmentCore
         if CommandLine.arguments.contains("--check-themes") { ThemeChecks.run() }
         if CommandLine.arguments.contains("--check-storage") { StorageChecks.run() }
         if CommandLine.arguments.contains("--check-editor") { EditorChecks.run() }
+        if CommandLine.arguments.contains("--check-mermaid") { MermaidChecks.run() }
+        if CommandLine.arguments.contains("--check-search") { SearchChecks.run() }
         if CommandLine.arguments.contains("--check-tabs") { TabChecks.run() }
         if CommandLine.arguments.contains("--check-panes") { PaneLayoutChecks.run() }
         if let index = CommandLine.arguments.firstIndex(of: "--export-comments") {
@@ -61,10 +63,7 @@ import ParchmentCore
                 Button("Next Tab") { workspace.nextTab(1) }.keyboardShortcut("]", modifiers: [.command, .shift])
                 Button("Previous Tab") { workspace.nextTab(-1) }.keyboardShortcut("[", modifiers: [.command, .shift])
             }
-            CommandGroup(after: .textEditing) {
-                Button("Find…") { showFind(.showFindInterface) }.keyboardShortcut("f")
-                Button("Find and Replace…") { showFind(.showReplaceInterface) }.keyboardShortcut("f", modifiers: [.command, .option])
-            }
+            SearchMenuCommands(workspace: workspace, search: workspace.search, findAndReplace: { showFind(.showReplaceInterface) })
             CommandMenu("Navigate") {
                 Button("Back") { workspace.goBack() }.keyboardShortcut("[").disabled(!workspace.canGoBack)
                 Button("Forward") { workspace.goForward() }.keyboardShortcut("]").disabled(!workspace.canGoForward)
@@ -94,8 +93,11 @@ import ParchmentCore
         Settings { AppSettings(themes: workspace.themes) }
     }
     private func showFind(_ action: NSTextFinder.Action) {
+        guard let document = workspace.active, document.layout.mode != .rendered,
+              let editor = document.sourceTextView else { return }
         let sender = NSMenuItem(); sender.tag = action.rawValue
-        NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: sender)
+        editor.window?.makeFirstResponder(editor)
+        editor.performFindPanelAction(sender)
     }
 }
 
@@ -171,6 +173,7 @@ struct WorkspaceView: View {
                 }.frame(height: 38).background(.bar)
                 Divider()
             }
+            SearchPanel(search: workspace.search)
             if let document = workspace.active {
                 DocumentWorkspace(document: document, workspace: workspace).id(document.id)
             } else {
