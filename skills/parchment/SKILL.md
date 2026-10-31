@@ -15,7 +15,9 @@ Discover the configured Parchment MCP tools and read their schemas. Clients can 
 
 The server executable is `Parchment.app/Contents/MacOS/ParchmentMCP`. A source build places it under `dist/`. The MCP client needs its absolute path. A separately installed helper needs `PARCHMENT_APP_PATH` set to the app bundle.
 
-If MCP tools are unavailable but the local helper exists, use `ParchmentMCP --call TOOL` with JSON arguments through stdin. It uses the same tools and credentials. It returns JSON and exits with status 1 on errors. For example, call `list_documents` with `{}`. Retain session credentials in this conversation across helper calls. Do not place tokens in command arguments, documents, or shared instructions. If the helper is also unavailable, report the missing connection and helper path. Do not claim that Parchment opened or received changes. Do not overwrite a file that can have unsaved changes in an open Parchment tab.
+If MCP tools are unavailable but the local helper exists, start `ParchmentMCP --bridge` and keep stdin open. Send one JSON object per line, such as `{"tool":"list_documents","arguments":{}}`. Each response contains `exit_code`, `result`, and `stderr`. Resume the retained session token through this same connection. The persistent helper sends keep-alives every 10 seconds, including while idle. Close stdin when the conversation is no longer available. `--call TOOL` handles one request and exits; it cannot maintain idle presence.
+
+Retain session credentials in this conversation across helper calls. Do not place tokens in command arguments, documents, or shared instructions. If the helper is also unavailable, report the missing connection and helper path. Do not claim that Parchment opened or received changes. Do not overwrite a file that can have unsaved changes in an open Parchment tab.
 
 Call `list_documents` to identify an existing tab. Match its absolute path or document ID. Unsaved tabs have IDs and no paths. If several tabs match the request, clarify the target before edits.
 
@@ -42,6 +44,8 @@ Parchment opens documents, receives tool calls, and can notify the owning agent 
 ## Register wake-up delivery and read the event bus
 
 Always prefer automatic notifications for document changes, comments, reviews, and attachment requests. Use `wake_up.mode: "command"` whenever the current host supports queuing input in the existing conversation.
+
+Before registration, read the current runtime's section in [Automatic wake-up by agent framework](references/automatic-wake-up.md). It covers Codex, Claude, Gemini, Cursor, OpenCode, Amp, Copilot, goose, editor agents, and application frameworks. Use its shared setup and verification steps. Adapter examples require an installed host integration; Parchment does not bundle those adapters. A command that runs a resumed turn is not a queue command.
 
 Supply `wake_up` in the same `create_session` call that registers the conversation. Registration validates and saves identity and delivery together. Do not create the session first and leave delivery for a later optional call.
 
@@ -161,7 +165,11 @@ Immediate comments and user replies arrive individually. Pending review comments
 
 Read the latest document before acting on feedback. A thread with `scope: "file"` and anchor state `file` applies to the entire document. It has no text range. Do not ask to reattach a file-level comment. Selection anchors contain the quoted passage, surrounding context, original range, and current match status. If an anchor is ambiguous or orphaned, inspect the document and clarify unresolved ambiguity before edits.
 
-Use `reply_to_thread` with `thread_id`, `body`, a unique `operation_id`, and the attachment credentials. Use `resolve_thread` only when the requested change is complete and resolution fits the user's workflow. Both tools preserve history. The server labels agent replies with 🤖 and excludes them from feedback delivery.
+Use `reply_to_thread` with `thread_id`, `body`, a unique `operation_id`, and the attachment credentials.
+
+After addressing an actionable comment, call `resolve_thread` to resolve its conversation. Resolve a thread only after all its requested changes or answers are complete. Keep informational comments open, including notes and observations that request no action. Keep blocked or partially addressed threads open. Honor an explicit request to leave a thread open.
+
+Both tools preserve history. The server labels agent replies with 🤖 and excludes them from feedback delivery.
 
 Call `acknowledge_feedback` with the last fully handled event's `cursor` and the attachment credentials. Do not acknowledge unhandled feedback. Acknowledging a cursor acknowledges earlier events too. Leave blocked work queued until handled or explicitly dismissed.
 
