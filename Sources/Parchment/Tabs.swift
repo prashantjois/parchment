@@ -7,6 +7,27 @@ enum TabCloseScope { case before, after, all }
 enum TabDropEdge { case before, after }
 
 @MainActor extension Workspace {
+    func activateTab(_ id: UUID) {
+        guard documents.contains(where: { $0.id == id }) else { return }
+        activeID = id; showTabSearch = false
+        focusActiveDocument(); scheduleRecovery()
+    }
+    func focusActiveDocument() {
+        active?.focusRequest = UUID()
+        activeTabRevealRequest = UUID()
+    }
+    func presentTabSearch() {
+        guard !documents.isEmpty, !showThemes, !composeComment else { return }
+        showTabSearch = true
+    }
+    func searchTabs(_ query: String) -> [EditorDocument] {
+        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        return documents.filter { document in
+            let draftTitle = document.url == nil ? String(document.text.prefix(while: { !$0.isNewline })) : ""
+            let searchable = document.title + " " + (document.url?.path ?? draftTitle)
+            return terms.allSatisfy { searchable.localizedStandardContains($0) }
+        }
+    }
     @discardableResult func moveTab(_ id: UUID, relativeTo target: UUID, edge: TabDropEdge) -> Bool {
         guard id != target, let source = documents.firstIndex(where: { $0.id == id }),
               documents.contains(where: { $0.id == target }) else { return false }
@@ -85,7 +106,8 @@ struct DocumentTab: View {
             }
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
             .contentShape(Rectangle())
-            .onTapGesture { workspace.activeID = document.id; workspace.scheduleRecovery() }
+            .onTapGesture { workspace.activateTab(document.id) }
+            .accessibilityAddTraits(selected ? .isSelected : [])
             .onDrag {
                 SelectionCommentPopover.hideAll()
                 return DocumentTabDrag.provider(for: document.id)
@@ -120,6 +142,108 @@ struct DocumentTab: View {
                 Divider()
                 FileLocationMenu(name: document.title, url: document.url)
             }
+    }
+}
+
+struct DocumentTabBar: View {
+    @ObservedObject var workspace: Workspace
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        ForEach(workspace.documents) { document in
+                            DocumentTab(document: document, workspace: workspace).id(document.id)
+                        }
+                    }
+                }
+                .onAppear { revealActive(using: proxy) }
+                .onChange(of: workspace.activeID) { _, _ in revealActive(using: proxy) }
+                .onChange(of: workspace.activeTabRevealRequest) { _, _ in revealActive(using: proxy) }
+                .onChange(of: workspace.documents.map(\.id)) { _, _ in revealActive(using: proxy) }
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { _ in revealActive(using: proxy) }
+            }
+            Button { workspace.presentTabSearch() } label: {
+                Image(systemName: "list.bullet.rectangle").frame(width: 38, height: 38)
+            }.buttonStyle(.plain).buttonFeedback("Search Tabs (⌘K)").accessibilityLabel("Search tabs")
+        }.frame(height: 38).background(.bar)
+    }
+    private func revealActive(using proxy: ScrollViewProxy) {
+        guard let id = workspace.activeID else { return }
+        DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
+    }
+}
+
+struct TabSearchPicker: View {
+    @ObservedObject var workspace: Workspace
+    @ViewState private var query = ""
+    @ViewState private var selectedID: UUID?
+    @FocusState private var focused: Bool
+    private var matches: [EditorDocument] { workspace.searchTabs(query) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search tabs by name or path…", text: $query)
+                    .textFieldStyle(.plain).focused($focused)
+                    .onKeyPress(keys: [.upArrow, .downArrow], phases: .down) { press in
+                        move(press.key == .downArrow ? 1 : -1); return .handled
+                    }
+                    .onSubmit(choose)
+                Button("Cancel") { workspace.showTabSearch = false }.keyboardShortcut(.cancelAction)
+            }.padding(16)
+            Divider()
+            if matches.isEmpty {
+                Text("No matching tabs").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 2) {
+                            ForEach(matches) { document in
+                                Button { workspace.activateTab(document.id) } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: document.id == workspace.activeID ? "checkmark" : "doc.text")
+                                            .foregroundStyle(.secondary).frame(width: 18)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(document.title).fontWeight(.medium).lineLimit(1)
+                                            Text(document.url?.path ?? (document.text.isEmpty ? "Unsaved document" : String(document.text.prefix(while: { !$0.isNewline }))))
+                                                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                        }
+                                        Spacer()
+                                        if document.isDirty { Circle().fill(.secondary).frame(width: 5, height: 5) }
+                                    }.padding(10).contentShape(Rectangle())
+                                        .background(document.id == selectedID ? Color.accentColor.opacity(0.15) : .clear)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }.buttonStyle(.plain).id(document.id)
+                            }
+                        }.padding(8)
+                    }.onChange(of: selectedID) { _, id in if let id { proxy.scrollTo(id) } }
+                        .onAppear { if let id = selectedID { proxy.scrollTo(id) } }
+                }
+            }
+            Divider()
+            HStack {
+                Text("\(matches.count) of \(workspace.documents.count) tabs")
+                Spacer()
+                Text("↑↓ to select · Return to open · Escape to close")
+            }.font(.caption).foregroundStyle(.secondary).padding(12)
+        }.frame(width: 620, height: 420)
+            .onAppear { selectedID = workspace.activeID; focused = true }
+            .onChange(of: query) { _, _ in selectedID = matches.first?.id }
+            .onChange(of: workspace.documents.map(\.id)) { _, _ in
+                if !matches.contains(where: { $0.id == selectedID }) { selectedID = matches.first?.id }
+            }
+            .onExitCommand { workspace.showTabSearch = false }
+    }
+    private func move(_ delta: Int) {
+        guard !matches.isEmpty else { return }
+        let current = matches.firstIndex { $0.id == selectedID }
+        let index = current.map { ($0 + delta + matches.count) % matches.count } ?? 0
+        selectedID = matches[index].id
+    }
+    private func choose() {
+        if let id = selectedID ?? matches.first?.id { workspace.activateTab(id) }
     }
 }
 

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ParchmentCore
 
 @MainActor enum TabChecks {
@@ -98,6 +99,76 @@ import ParchmentCore
         expect(!failed.closeTabs(.all) && failed.documents.map(\.id) == [broken.id, last.id] &&
                !failed.documents.contains(where: { $0 === first }) && failed.error != nil && broken.isDirty,
                "a save failure stops close-all and preserves unsaved work and remaining tabs")
+
+        let overflow = workspace("overflow")
+        let many = (0..<20).map { add("Draft \($0)\n", to: overflow) }
+        overflow.activateTab(many[0].id)
+        many[0].layout.mode = .raw
+        let host = NSHostingView(rootView: WorkspaceView(workspace: overflow))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        func settle() async {
+            host.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(350))
+        }
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        await settle()
+        let bar = descendants(host).compactMap { $0 as? NSScrollView }.first {
+            $0.frame.height <= 45 && ($0.documentView?.frame.width ?? 0) > $0.contentSize.width
+        }
+        expect(bar != nil, "many open tabs create a horizontally scrolling tab bar")
+        overflow.activateTab(many.last!.id)
+        await settle()
+        expect((bar?.contentView.bounds.minX ?? 0) > 100, "activating the last tab scrolls it into view")
+        bar?.contentView.scroll(to: .zero)
+        if let bar { bar.reflectScrolledClipView(bar.contentView) }
+        overflow.activateTab(many.last!.id)
+        await settle()
+        expect((bar?.contentView.bounds.minX ?? 0) > 100, "reselecting the current tab reveals it after manually scrolling away")
+        expect(window.firstResponder === many.last?.sourceTextView, "activating a Raw tab focuses its editor")
+        overflow.activateTab(many[0].id)
+        await settle()
+        expect((bar?.contentView.bounds.minX ?? 100) < 1, "switching back to the first tab reveals it")
+        overflow.nextTab(-1)
+        await settle()
+        expect(overflow.activeID == many.last?.id && (bar?.contentView.bounds.minX ?? 0) > 100,
+               "keyboard tab switching also reveals and focuses the selected tab")
+        overflow.moveTab(many.last!.id, relativeTo: many[0].id, edge: .before)
+        await settle()
+        expect((bar?.contentView.bounds.minX ?? 100) < 1, "reordering keeps the active tab visible in its new position")
+        overflow.activateTab(many[18].id)
+        window.setContentSize(NSSize(width: 700, height: 600))
+        await settle()
+        if let bar, let content = bar.documentView {
+            expect(abs(bar.contentView.bounds.maxX - content.bounds.maxX) < 5,
+                   "resizing the window keeps the active last tab fully visible")
+        }
+        expect(overflow.searchTabs("Draft 17").map(\.id) == [many[17].id], "tab search identifies unsaved drafts by their first line")
+        expect(overflow.searchTabs("   ").count == many.count && overflow.searchTabs("missing-name").isEmpty,
+               "tab search handles empty filters and no matches")
+        let namedPath = root.appendingPathComponent("Café notes.md")
+        try! "Saved file".write(to: namedPath, atomically: true, encoding: .utf8)
+        let named = EditorDocument(url: namedPath, text: "Saved file")
+        overflow.attach(named)
+        named.layout.mode = .rendered; overflow.activateTab(named.id)
+        await settle()
+        let preview = descendants(host).compactMap { $0 as? PreviewWebView }.first
+        let responder = window.firstResponder as? NSView
+        expect(preview != nil && (responder === preview || responder?.isDescendant(of: preview!) == true),
+               "activating a Rendered tab focuses its preview")
+        expect(overflow.searchTabs("CAFE NOTES").map(\.id) == [named.id] && overflow.searchTabs(root.lastPathComponent).map(\.id) == [named.id],
+               "tab search matches names and paths without case or accent differences")
+        let shortcut = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "k", charactersIgnoringModifiers: "k", isARepeat: false, keyCode: 40)!
+        expect(SearchShortcut.action(for: shortcut) == .tabs, "Command-K routes to tab search")
+        overflow.presentTabSearch()
+        expect(overflow.showTabSearch, "tab search can be opened for the current workspace")
+        overflow.activateTab(many[17].id)
+        expect(!overflow.showTabSearch && overflow.activeID == many[17].id && many[17].focusRequest != nil,
+               "choosing a tab dismisses the picker and requests document focus")
+        for document in overflow.documents { document.saveTask?.cancel(); document.renderTask?.cancel(); document.stopWatching() }
         print("Tab checks: \(failures) failures")
         return failures == 0 ? 0 : 1
     }

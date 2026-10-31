@@ -2,13 +2,14 @@ import AppKit
 import SwiftUI
 
 enum SearchShortcut {
-    case document, allDocuments, next, previous, close
+    case document, allDocuments, tabs, next, previous, close
     static func action(for event: NSEvent) -> SearchShortcut? {
         guard event.type == .keyDown else { return nil }
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
         let key = event.charactersIgnoringModifiers?.lowercased()
         if modifiers.isEmpty && event.keyCode == 53 { return .close }
         if modifiers == .command && key == "f" { return .document }
+        if modifiers == .command && key == "k" { return .tabs }
         if modifiers == [.command, .shift] && key == "m" { return .allDocuments }
         if modifiers == .command && key == "g" { return .next }
         if modifiers == [.command, .shift] && key == "g" { return .previous }
@@ -18,6 +19,7 @@ enum SearchShortcut {
         switch self {
         case .document: workspace.search.open(.document)
         case .allDocuments: workspace.search.open(.allDocuments)
+        case .tabs: workspace.presentTabSearch()
         case .next: workspace.search.move(1)
         case .previous: workspace.search.move(-1)
         case .close: workspace.search.close()

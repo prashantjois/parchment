@@ -195,6 +195,7 @@ struct SourcePane: NSViewRepresentable {
         weak var scroll: NSScrollView?
         var observer: NSObjectProtocol?
         var lastJump: UUID?
+        var lastFocusRequest: UUID?
         var restoring = false
         var lastScroll = -1.0
         private var lastSynchronizedText: String
@@ -214,6 +215,10 @@ struct SourcePane: NSViewRepresentable {
         private func refreshEditor() {
             guard let text, let scroll, !text.hasMarkedText() else { return }
             let document = parent.document
+            if let request = document.focusRequest, request != lastFocusRequest,
+               let window = text.window, window.attachedSheet == nil {
+                lastFocusRequest = request; window.makeFirstResponder(text)
+            }
             // A native prediction can differ from the committed model without being an external edit.
             if document.text != lastSynchronizedText {
                 let selection = text.selectedRange()

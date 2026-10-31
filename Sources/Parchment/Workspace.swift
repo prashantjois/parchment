@@ -25,6 +25,7 @@ enum DocumentSaveError: LocalizedError {
     @Published var selection = NSRange(location: 0, length: 0)
     @Published var searchRanges: [NSRange] = []
     @Published var activeSearchRange: NSRange?
+    @Published var focusRequest: UUID?
     @Published var jump: JumpRequest?
     @Published var selectedThread: UUID?
     @Published var commentDraftAnchor: CommentAnchor?
@@ -267,6 +268,8 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     var recordsNavigation = false
     @Published var error: String?
     @Published var showThemes = false
+    @Published var showTabSearch = false
+    @Published var activeTabRevealRequest = UUID()
     @Published var composeComment = false
     @Published var themes = ThemeLibrary()
     var integration: IntegrationController?
@@ -298,6 +301,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
         }
         document.startWatching()
         documents.append(document); activeID = document.id
+        focusActiveDocument()
     }
     @discardableResult func startIntegration(headless: Bool = false, server: LocalAPIServer? = nil) -> Bool {
         do { integration = try IntegrationController(workspace: self, directory: support, headless: headless, server: server); return true }
@@ -311,6 +315,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     }
     func open(_ url: URL) {
         navigate { openWithoutHistory(url) }
+        focusActiveDocument()
     }
     private func openWithoutHistory(_ url: URL) {
         let url = url.standardizedFileURL.resolvingSymlinksInPath()
@@ -452,7 +457,7 @@ struct SessionSnapshot: Codable { var active: UUID?; var documents: [SessionDocu
     func nextTab(_ delta: Int) {
         guard !documents.isEmpty else { return }
         let current = documents.firstIndex(where: { $0.id == activeID }) ?? 0
-        activeID = documents[(current + delta + documents.count) % documents.count].id
+        activateTab(documents[(current + delta + documents.count) % documents.count].id)
     }
     func exportComments() {
         guard let active else { return }

@@ -140,6 +140,7 @@ struct RenderedPane: NSViewRepresentable {
         var loadedSourceHash = ""
         var ready = false
         var lastJump: UUID?
+        var lastFocusRequest: UUID?
         var lastScroll = -1.0
         var lastHighlights = ""
         var lastSearchHighlights = ""
@@ -156,6 +157,10 @@ struct RenderedPane: NSViewRepresentable {
         func updateState() {
             guard let web else { return }
             let doc = parent.document
+            if doc.layout.mode == .rendered, let request = doc.focusRequest, request != lastFocusRequest,
+               let window = web.window, window.attachedSheet == nil {
+                lastFocusRequest = request; window.makeFirstResponder(web)
+            }
             let policy = String(data: try! JSONSerialization.data(withJSONObject: ["enabled": parent.loadRemoteImages, "sources": doc.loadedRemoteImages.sorted()]), encoding: .utf8)!
             if policy != lastImagePolicy {
                 lastImagePolicy = policy

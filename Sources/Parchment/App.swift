@@ -65,6 +65,8 @@ import ParchmentCore
             }
             SearchMenuCommands(workspace: workspace, search: workspace.search, findAndReplace: { showFind(.showReplaceInterface) })
             CommandMenu("Navigate") {
+                Button("Search Tabs…") { workspace.presentTabSearch() }.keyboardShortcut("k").disabled(workspace.documents.isEmpty)
+                Divider()
                 Button("Back") { workspace.goBack() }.keyboardShortcut("[").disabled(!workspace.canGoBack)
                 Button("Forward") { workspace.goForward() }.keyboardShortcut("]").disabled(!workspace.canGoForward)
             }
@@ -163,14 +165,7 @@ struct WorkspaceView: View {
     var body: some View {
         VStack(spacing: 0) {
             if !workspace.documents.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        ForEach(workspace.documents) { document in
-                            DocumentTab(document: document, workspace: workspace)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                }.frame(height: 38).background(.bar)
+                DocumentTabBar(workspace: workspace)
                 Divider()
             }
             SearchPanel(search: workspace.search)
@@ -198,6 +193,9 @@ struct WorkspaceView: View {
             }
         }
         .sheet(isPresented: $workspace.showThemes) { ThemeSettings(library: workspace.themes) }
+        .sheet(isPresented: $workspace.showTabSearch, onDismiss: workspace.focusActiveDocument) {
+            TabSearchPicker(workspace: workspace)
+        }
         .sheet(isPresented: $workspace.composeComment) { if let doc = workspace.active { CommentComposer(document: doc) } }
         .alert("Parchment", isPresented: Binding(get: { workspace.error != nil }, set: { if !$0 { workspace.error = nil } })) {
             Button("OK", role: .cancel) { workspace.error = nil }
